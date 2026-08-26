@@ -133,7 +133,19 @@
       <option value="auto" data-i18n="options_geminiToneAuto">おまかせ（発言のニュアンスに応じて自然に揺らぐ）</option>
       <option value="frank" data-i18n="options_geminiToneFrank">フランクに統一（〜だね、〜だよ）</option>
       <option value="polite" data-i18n="options_geminiTonePolite">丁寧に統一（〜です、〜ます）</option>
+      <option value="cat" data-i18n="options_geminiToneCat">猫語（〜にゃ、〜にゃん）</option>
+      <option value="ojousama" data-i18n="options_geminiToneOjousama">お嬢様（〜ですわ、〜ですのよ）</option>
+      <option value="kansai" data-i18n="options_geminiToneKansai">関西弁（〜やで、〜やねん）</option>
+      <option value="custom" data-i18n="options_geminiToneCustom">カスタム（下記に自由記述）</option>
     </select>
+
+    <div id="geminiCustomPromptWrapper" style="display:none;">
+      <span class="fieldLabel" data-i18n="options_geminiCustomPromptLabel">カスタムプロンプト</span>
+      <textarea id="geminiCustomPromptInput" rows="3" data-i18n="options_geminiCustomPromptPlaceholder" data-i18n-attr="placeholder"
+        style="width:100%; box-sizing:border-box; font-size:13px; padding:6px 8px; border:1px solid #d0d0d0; border-radius:6px; background:#fff; color:#1a1a1a; font-family:inherit; resize:vertical;"
+        placeholder="例：語尾を「〜なのだ」で統一してください"></textarea>
+      <p class="help" data-i18n="options_geminiCustomPromptHelp">内容自体は正確に翻訳させつつ、口調だけを変える指示を書くのがおすすめです（例：「内容は正確に、語尾だけ〜なのだ、にしてください」）。過激な内容への変更依頼などは無視される場合があります。</p>
+    </div>
   </div>
 
   <h2 data-i18n="options_languageHeading">翻訳する言語</h2>

@@ -7,7 +7,8 @@ const SETTINGS_DEFAULTS = {
   translationProvider: "google", // "google" | "deepl" | "gemini"
   deeplApiKey: "",
   geminiApiKey: "",
-  geminiTone: "auto", // "auto" | "frank" | "polite"
+  geminiTone: "auto", // "auto" | "frank" | "polite" | "cat" | "ojousama" | "kansai" | "custom"
+  geminiCustomPrompt: "",
   sourceLang: "auto", // "auto" または言語コード（例: "en"）
   targetLang: "ja", // "browser"（ブラウザの言語設定）または言語コード
 };
@@ -107,6 +108,14 @@ const LANG_NAMES = {
 
 const GEMINI_MODEL = "gemini-2.5-flash-lite";
 
+const TONE_PRESETS = {
+  frank: "親しみやすい会話調（〜だね、〜だよ、〜かも）で統一してください。",
+  polite: "落ち着いた敬体（〜です、〜ます）で統一してください。",
+  cat: "すべての文末を「〜にゃ」「〜にゃん」等の語尾にし、猫のような口調で統一してください（内容自体は真面目に正確に翻訳しつつ、口調だけを猫っぽくしてください）。",
+  ojousama: "上品なお嬢様口調（〜ですわ、〜ですのよ、〜ますわ）で統一してください（内容自体は真面目に正確に翻訳しつつ、口調だけをお嬢様風にしてください）。",
+  kansai: "関西弁（〜やで、〜やねん、〜せやから）で統一してください（内容自体は真面目に正確に翻訳しつつ、口調だけを関西弁にしてください）。",
+};
+
 function buildGeminiSystemPrompt(settings) {
   const targetName = LANG_NAMES[resolveTargetLang(settings.targetLang)] || "日本語";
   const sourceInstruction =
@@ -115,10 +124,10 @@ function buildGeminiSystemPrompt(settings) {
       : "入力されたテキスト（言語は自動判別）を、";
 
   let toneInstruction = "";
-  if (settings.geminiTone === "frank") {
-    toneInstruction = "親しみやすい会話調（〜だね、〜だよ、〜かも）で統一してください。";
-  } else if (settings.geminiTone === "polite") {
-    toneInstruction = "落ち着いた敬体（〜です、〜ます）で統一してください。";
+  if (settings.geminiTone === "custom" && settings.geminiCustomPrompt) {
+    toneInstruction = settings.geminiCustomPrompt.trim();
+  } else if (TONE_PRESETS[settings.geminiTone]) {
+    toneInstruction = TONE_PRESETS[settings.geminiTone];
   }
 
   return (
@@ -221,7 +230,7 @@ async function processQueue() {
     const { text, sendResponse } = queue.shift();
     // リクエストのたびに最新の設定を読み直す（Service Worker再起動直後のレース対策）
     const settings = await getSettings();
-    const cacheKey = `${settings.translationProvider}:${settings.sourceLang}:${settings.targetLang}:${settings.geminiTone}:${text}`;
+    const cacheKey = `${settings.translationProvider}:${settings.sourceLang}:${settings.targetLang}:${settings.geminiTone}:${settings.geminiCustomPrompt}:${text}`;
 
     if (cache.has(cacheKey)) {
       sendResponse({ success: true, text: cache.get(cacheKey) });

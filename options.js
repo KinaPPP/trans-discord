@@ -10,6 +10,7 @@ const DEFAULT_SETTINGS = {
   deeplApiKey: "",
   geminiApiKey: "",
   geminiTone: "auto",
+  geminiCustomPrompt: "",
   sourceLang: "auto",
   targetLang: "ja",
   skipNativeLanguage: true,
@@ -20,6 +21,8 @@ const providerSelect = document.getElementById("providerSelect");
 const deeplKeyInput = document.getElementById("deeplKeyInput");
 const geminiKeyInput = document.getElementById("geminiKeyInput");
 const geminiToneSelect = document.getElementById("geminiToneSelect");
+const geminiCustomPromptWrapper = document.getElementById("geminiCustomPromptWrapper");
+const geminiCustomPromptInput = document.getElementById("geminiCustomPromptInput");
 const sourceLangSelect = document.getElementById("sourceLangSelect");
 const targetLangSelect = document.getElementById("targetLangSelect");
 const skipNativeLanguageToggle = document.getElementById("skipNativeLanguageToggle");
@@ -49,15 +52,22 @@ LANGUAGE_CODES.forEach((code) => {
   targetLangSelect.appendChild(opt);
 });
 
+function updateCustomPromptVisibility() {
+  geminiCustomPromptWrapper.style.display =
+    geminiToneSelect.value === "custom" ? "block" : "none";
+}
+
 chrome.storage.local.get(DEFAULT_SETTINGS, (result) => {
   providerSelect.value = result.translationProvider;
   deeplKeyInput.value = result.deeplApiKey;
   geminiKeyInput.value = result.geminiApiKey;
   geminiToneSelect.value = result.geminiTone;
+  geminiCustomPromptInput.value = result.geminiCustomPrompt;
   sourceLangSelect.value = result.sourceLang;
   targetLangSelect.value = result.targetLang;
   skipNativeLanguageToggle.checked = result.skipNativeLanguage;
   skipShortMessagesToggle.checked = result.skipShortMessages;
+  updateCustomPromptVisibility();
 });
 
 providerSelect.addEventListener("change", () => {
@@ -74,6 +84,11 @@ geminiKeyInput.addEventListener("change", () => {
 
 geminiToneSelect.addEventListener("change", () => {
   chrome.storage.local.set({ geminiTone: geminiToneSelect.value });
+  updateCustomPromptVisibility();
+});
+
+geminiCustomPromptInput.addEventListener("change", () => {
+  chrome.storage.local.set({ geminiCustomPrompt: geminiCustomPromptInput.value.trim() });
 });
 
 sourceLangSelect.addEventListener("change", () => {

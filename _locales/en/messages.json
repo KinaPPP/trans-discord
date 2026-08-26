@@ -44,6 +44,13 @@
   "options_geminiToneAuto": { "message": "Let it vary naturally with each message" },
   "options_geminiToneFrank": { "message": "Always casual" },
   "options_geminiTonePolite": { "message": "Always polite" },
+  "options_geminiToneCat": { "message": "Cat-speak (nya~)" },
+  "options_geminiToneOjousama": { "message": "Posh \"ojou-sama\" style" },
+  "options_geminiToneKansai": { "message": "Kansai dialect" },
+  "options_geminiToneCustom": { "message": "Custom (write your own below)" },
+  "options_geminiCustomPromptLabel": { "message": "Custom prompt" },
+  "options_geminiCustomPromptPlaceholder": { "message": "e.g. End every sentence with \"nya\"" },
+  "options_geminiCustomPromptHelp": { "message": "It works best if you ask it to keep the content accurate and only change the tone (e.g. \"Keep the meaning accurate, just end sentences with 'nya'\"). Requests for extreme content changes may be ignored." },
 
   "options_languageHeading": { "message": "Translation Languages" },
   "options_sourceLabel": { "message": "From" },

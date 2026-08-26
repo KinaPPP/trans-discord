@@ -44,6 +44,13 @@
   "options_geminiToneAuto": { "message": "おまかせ（発言のニュアンスに応じて自然に揺らぐ）" },
   "options_geminiToneFrank": { "message": "フランクに統一（〜だね、〜だよ）" },
   "options_geminiTonePolite": { "message": "丁寧に統一（〜です、〜ます）" },
+  "options_geminiToneCat": { "message": "猫語（〜にゃ、〜にゃん）" },
+  "options_geminiToneOjousama": { "message": "お嬢様（〜ですわ、〜ですのよ）" },
+  "options_geminiToneKansai": { "message": "関西弁（〜やで、〜やねん）" },
+  "options_geminiToneCustom": { "message": "カスタム（下記に自由記述）" },
+  "options_geminiCustomPromptLabel": { "message": "カスタムプロンプト" },
+  "options_geminiCustomPromptPlaceholder": { "message": "例：語尾を「〜なのだ」で統一してください" },
+  "options_geminiCustomPromptHelp": { "message": "内容自体は正確に翻訳させつつ、口調だけを変える指示を書くのがおすすめです（例：「内容は正確に、語尾だけ〜なのだ、にしてください」）。過激な内容への変更依頼などは無視される場合があります。" },
 
   "options_languageHeading": { "message": "翻訳する言語" },
   "options_sourceLabel": { "message": "翻訳元" },
