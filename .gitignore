@@ -1,0 +1,13 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# エディタ
+.vscode/
+.idea/
+
+# ビルド成果物（配布用ZIP）
+*.zip
+
+# ローカル作業用
+*.log

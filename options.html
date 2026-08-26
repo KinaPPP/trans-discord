@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<title>トランス☆ディスコ - 詳細設定</title>
+<style>
+  body {
+    font-family: "メイリオ", "Meiryo", "Yu Gothic", sans-serif;
+    max-width: 480px;
+    margin: 40px auto;
+    padding: 0 20px;
+    color: #1a1a1a;
+    background: #e8e8e8;
+  }
+  h1 {
+    font-size: 18px;
+    margin-bottom: 4px;
+    color: #1a1a1a;
+  }
+  h2 {
+    font-size: 14px;
+    margin: 28px 0 8px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid #d0d0d0;
+    color: #1a1a1a;
+  }
+  .section {
+    background: #f7f7f7;
+    border: 1px solid #d0d0d0;
+    border-radius: 10px;
+    padding: 16px 20px;
+    margin-bottom: 16px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  }
+  label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    margin-bottom: 10px;
+    color: #1a1a1a;
+  }
+  .fieldLabel {
+    font-size: 13px;
+    display: block;
+    margin: 12px 0 4px;
+    color: #1a1a1a;
+  }
+  .row {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+  }
+  select,
+  input[type="password"] {
+    width: 100%;
+    box-sizing: border-box;
+    font-size: 13px;
+    padding: 6px 8px;
+    border: 1px solid #d0d0d0;
+    border-radius: 6px;
+    background: #fff;
+    color: #1a1a1a;
+  }
+  button {
+    font-size: 12px;
+    font-weight: 600;
+    padding: 7px 14px;
+    border: none;
+    border-radius: 6px;
+    background: #4a8ce0;
+    color: #fff;
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  }
+  button:hover {
+    background: #3a7bd5;
+  }
+  button:active {
+    background: #2d6abf;
+  }
+  p.help {
+    font-size: 11px;
+    color: #888;
+    margin: 6px 0 0;
+    line-height: 1.6;
+  }
+  a {
+    color: #4a8ce0;
+  }
+  .arrow {
+    font-size: 16px;
+    color: #888;
+  }
+</style>
+</head>
+<body>
+  <h1>トランス☆ディスコ - 詳細設定</h1>
+  <p class="help">ここでの変更は自動的に保存されます。</p>
+
+  <h2>翻訳エンジン</h2>
+  <div class="section">
+    <span class="fieldLabel">使用する翻訳エンジン</span>
+    <select id="providerSelect">
+      <option value="google">Google翻訳</option>
+      <option value="deepl">DeepL（要APIキー）</option>
+    </select>
+
+    <span class="fieldLabel">DeepL APIキー</span>
+    <input type="password" id="deeplKeyInput" placeholder="xxxxxxxx-xxxx-...:fx" />
+    <p class="help">
+      <a href="https://www.deepl.com/pro-api" target="_blank" rel="noopener">DeepL公式サイト</a>
+      の無料プランから取得できます（無料キーは末尾が「:fx」）。DeepLが制限にかかった場合は自動的にGoogle翻訳に切り替わります。
+    </p>
+
+    <div id="deeplUsageBox" style="margin-top:10px; font-size:12px; color:#333;"></div>
+    <button id="deeplUsageRefreshButton" type="button" style="margin-top:6px; width:auto; padding:5px 12px;">使用量を確認</button>
+  </div>
+
+  <h2>翻訳する言語</h2>
+  <div class="section">
+    <div class="row">
+      <div style="flex:1;">
+        <span class="fieldLabel">翻訳元</span>
+        <select id="sourceLangSelect"></select>
+      </div>
+      <span class="arrow">→</span>
+      <div style="flex:1;">
+        <span class="fieldLabel">翻訳先</span>
+        <select id="targetLangSelect"></select>
+      </div>
+    </div>
+    <p class="help">翻訳元を特定の言語に固定すると、その言語の発言だけに翻訳ボタンが表示されるようになります（例：翻訳元を日本語にすると、同じスレッド内の英語の発言にはボタンが出ません）。日本語・中国語・韓国語・ロシア語・タイ語はそれぞれの文字体系で判定し、それ以外（英・仏・独・西・葡・伊・越・尼）はラテン文字の有無による簡易判定です。翻訳先を「自動（ブラウザの言語設定）」にすると、お使いのブラウザの表示言語に合わせて翻訳されます。</p>
+  </div>
+
+  <h2>表示ルール</h2>
+  <div class="section">
+    <label>
+      <input type="checkbox" id="skipNativeLanguageToggle" />
+      日本語主体の発言には表示しない
+    </label>
+    <label>
+      <input type="checkbox" id="skipShortMessagesToggle" />
+      極端に短い発言には表示しない
+    </label>
+  </div>
+
+  <script src="options.js"></script>
+</body>
+</html>

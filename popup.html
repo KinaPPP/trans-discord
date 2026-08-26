@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<style>
+  body {
+    font-family: "メイリオ", "Meiryo", "Yu Gothic", sans-serif;
+    width: 230px;
+    padding: 14px;
+    margin: 0;
+    background: #e8e8e8;
+    color: #1a1a1a;
+  }
+  h1 {
+    font-size: 13px;
+    margin: 0 0 10px;
+    color: #1a1a1a;
+  }
+  label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: #1a1a1a;
+  }
+  p {
+    font-size: 11px;
+    color: #888;
+    margin: 8px 0 0;
+    line-height: 1.5;
+  }
+  hr {
+    border: none;
+    border-top: 1px solid #d0d0d0;
+    margin: 12px 0;
+  }
+  button,
+  .linkButton {
+    display: block;
+    width: 100%;
+    padding: 8px 0;
+    font-size: 12px;
+    font-weight: 600;
+    border: none;
+    border-radius: 6px;
+    background: #4a8ce0;
+    color: #fff;
+    cursor: pointer;
+    text-align: center;
+    text-decoration: none;
+    box-sizing: border-box;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  }
+  button:hover,
+  .linkButton:hover {
+    background: #3a7bd5;
+  }
+  button:active,
+  .linkButton:active {
+    background: #2d6abf;
+  }
+  label + label {
+    margin-top: 8px;
+  }
+</style>
+</head>
+<body>
+  <h1>トランス☆ディスコ</h1>
+
+  <label>
+    <input type="checkbox" id="extensionEnabledToggle" />
+    拡張機能を有効にする
+  </label>
+  <p>OFFにすると、青いエリアの表示も含めて一切動作しなくなります。</p>
+
+  <hr />
+
+  <label>
+    <input type="checkbox" id="autoTranslateToggle" />
+    自動翻訳を有効にする
+  </label>
+  <p>ONの場合も、開いた直後は「クリックして翻訳」が並ぶだけです。どれか1つをクリックすると、そこから自動翻訳が始まります。OFFならクリックした発言だけ翻訳されます。</p>
+
+  <hr />
+
+  <button id="captchaButton" type="button">翻訳が出ない場合はこちら</button>
+  <p>Google翻訳から「ロボットではありません」認証を求められている可能性があります。ボタンを押すと確認用ページが新しいタブで開きます。</p>
+
+  <hr />
+
+  <a href="#" id="openOptionsLink" class="linkButton">詳細設定を開く</a>
+  <p>翻訳エンジン、翻訳する言語、表示ルールなどはこちらから設定できます。</p>
+
+  <script src="popup.js"></script>
+</body>
+</html>
