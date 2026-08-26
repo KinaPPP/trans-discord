@@ -1,0 +1,72 @@
+{
+  "extName": { "message": "トランス☆ディスコ" },
+  "extDescription": { "message": "Discord Web版のチャット・フォーラムタイトルを逐次翻訳します" },
+
+  "popup_extensionEnabledLabel": { "message": "拡張機能を有効にする" },
+  "popup_extensionEnabledHelp": { "message": "OFFにすると、青いエリアの表示も含めて一切動作しなくなります。" },
+  "popup_autoTranslateLabel": { "message": "自動翻訳を有効にする" },
+  "popup_autoTranslateHelp": { "message": "ONの場合も、開いた直後は「クリックして翻訳」が並ぶだけです。どれか1つをクリックすると、そこから自動翻訳が始まります。OFFならクリックした発言だけ翻訳されます。" },
+  "popup_captchaButtonLabel": { "message": "Google翻訳が出ない場合はこちら" },
+  "popup_captchaHelp": { "message": "Google翻訳から「ロボットではありません」認証を求められている可能性があります。ボタンを押すと確認用ページが新しいタブで開きます（DeepL/Geminiのエラーには関係ありません）。" },
+  "popup_openOptionsLabel": { "message": "詳細設定を開く" },
+  "popup_openOptionsHelp": { "message": "翻訳エンジン、翻訳する言語、表示ルールなどはこちらから設定できます。" },
+
+  "options_pageTitle": { "message": "トランス☆ディスコ - 詳細設定" },
+  "options_pageHeading": { "message": "トランス☆ディスコ - 詳細設定" },
+  "options_autoSaveNote": { "message": "ここでの変更は自動的に保存されます。" },
+
+  "options_engineHeading": { "message": "翻訳エンジン" },
+  "options_providerLabel": { "message": "使用する翻訳エンジン" },
+  "options_providerGoogle": { "message": "Google翻訳" },
+  "options_providerDeepl": { "message": "DeepL（要APIキー）" },
+  "options_providerGemini": { "message": "Gemini（要APIキー・ゲーム用語/スラングに強い）" },
+
+  "options_deeplKeyLabel": { "message": "DeepL APIキー" },
+  "options_deeplKeyHelpPrefix": { "message": "" },
+  "options_deeplKeyHelpLink": { "message": "DeepL公式サイト" },
+  "options_deeplKeyHelpSuffix": { "message": "の無料プランから取得できます（無料キーは末尾が「:fx」）。DeepLが制限にかかった場合、Geminiキーが設定されていればGeminiに、それも無ければGoogle翻訳に自動的に切り替わります。" },
+  "options_deeplUsageButtonLabel": { "message": "使用量を確認" },
+  "options_deeplUsageEmptyKey": { "message": "APIキーを入力すると使用量を確認できます。" },
+  "options_deeplUsageChecking": { "message": "確認中…" },
+  "options_deeplUsageResult": { "message": "使用量: $COUNT$ / $LIMIT$ 文字（$PERCENT$%、残り $REMAINING$ 文字）", "placeholders": {
+    "count": { "content": "$1" }, "limit": { "content": "$2" }, "percent": { "content": "$3" }, "remaining": { "content": "$4" }
+  } },
+  "options_deeplUsageError": { "message": "使用量を取得できませんでした（APIキーを確認してください）。" },
+
+  "options_geminiKeyLabel": { "message": "Gemini APIキー" },
+  "options_geminiKeyHelpPrefix": { "message": "" },
+  "options_geminiKeyHelpLink": { "message": "Google AI Studio" },
+  "options_geminiKeyHelpMiddle1": { "message": "で無料発行できます（クレジットカード不要）。" },
+  "options_geminiKeyHelpBold": { "message": "Gemini Appの有料プラン（Gemini Pro等）とは別物" },
+  "options_geminiKeyHelpMiddle2": { "message": "で、ログイン情報は流用できないため、必ずここでAPIキーを発行・入力してください。ゲーム用語やスラングの解釈が機械翻訳より自然になりやすい一方、発言ごとに口調が揺れやすい・処理が少し遅いという特性があります。ダークファンタジー系の過激な単語（Flayedなど）で翻訳がブロックされないよう、セーフティフィルターは緩めに設定しています。失敗時は、DeepLキーが設定されていればDeepLに、それも無ければGoogle翻訳に自動的に切り替わります。" },
+
+  "options_geminiToneLabel": { "message": "Geminiの口調" },
+  "options_geminiToneAuto": { "message": "おまかせ（発言のニュアンスに応じて自然に揺らぐ）" },
+  "options_geminiToneFrank": { "message": "フランクに統一（〜だね、〜だよ）" },
+  "options_geminiTonePolite": { "message": "丁寧に統一（〜です、〜ます）" },
+
+  "options_languageHeading": { "message": "翻訳する言語" },
+  "options_sourceLabel": { "message": "翻訳元" },
+  "options_targetLabel": { "message": "翻訳先" },
+  "options_languageHelp": { "message": "翻訳元を特定の言語に固定すると、その言語の発言だけに翻訳ボタンが表示されるようになります（例：翻訳元を日本語にすると、同じスレッド内の英語の発言にはボタンが出ません）。日本語・中国語・韓国語・ロシア語・タイ語はそれぞれの文字体系で判定し、それ以外（英・仏・独・西・葡・伊・越・尼）はラテン文字の有無による簡易判定です。翻訳先を「自動（ブラウザの言語設定）」にすると、お使いのブラウザの表示言語に合わせて翻訳されます。この言語設定はGeminiにもそのまま反映されます。" },
+
+  "options_displayRulesHeading": { "message": "表示ルール" },
+  "options_skipNativeLabel": { "message": "日本語主体の発言には表示しない" },
+  "options_skipShortLabel": { "message": "極端に短い発言には表示しない" },
+
+  "lang_auto": { "message": "自動検出" },
+  "lang_browser": { "message": "自動（ブラウザの言語設定）" },
+  "lang_ja": { "message": "日本語" },
+  "lang_en": { "message": "英語" },
+  "lang_zh": { "message": "中国語" },
+  "lang_ko": { "message": "韓国語" },
+  "lang_fr": { "message": "フランス語" },
+  "lang_de": { "message": "ドイツ語" },
+  "lang_es": { "message": "スペイン語" },
+  "lang_pt": { "message": "ポルトガル語" },
+  "lang_it": { "message": "イタリア語" },
+  "lang_ru": { "message": "ロシア語" },
+  "lang_th": { "message": "タイ語" },
+  "lang_vi": { "message": "ベトナム語" },
+  "lang_id": { "message": "インドネシア語" }
+}

@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8" />
-<title>トランス☆ディスコ - 詳細設定</title>
+<title id="pageTitle" data-i18n="options_pageTitle">トランス☆ディスコ - 詳細設定</title>
 <style>
   body {
     font-family: "メイリオ", "Meiryo", "Yu Gothic", sans-serif;
@@ -95,56 +95,76 @@
 </style>
 </head>
 <body>
-  <h1>トランス☆ディスコ - 詳細設定</h1>
-  <p class="help">ここでの変更は自動的に保存されます。</p>
+  <h1 data-i18n="options_pageHeading">トランス☆ディスコ - 詳細設定</h1>
+  <p class="help" data-i18n="options_autoSaveNote">ここでの変更は自動的に保存されます。</p>
 
-  <h2>翻訳エンジン</h2>
+  <h2 data-i18n="options_engineHeading">翻訳エンジン</h2>
   <div class="section">
-    <span class="fieldLabel">使用する翻訳エンジン</span>
+    <span class="fieldLabel" data-i18n="options_providerLabel">使用する翻訳エンジン</span>
     <select id="providerSelect">
-      <option value="google">Google翻訳</option>
-      <option value="deepl">DeepL（要APIキー）</option>
+      <option value="google" data-i18n="options_providerGoogle">Google翻訳</option>
+      <option value="deepl" data-i18n="options_providerDeepl">DeepL（要APIキー）</option>
+      <option value="gemini" data-i18n="options_providerGemini">Gemini（要APIキー・ゲーム用語/スラングに強い）</option>
     </select>
 
-    <span class="fieldLabel">DeepL APIキー</span>
+    <span class="fieldLabel" data-i18n="options_deeplKeyLabel">DeepL APIキー</span>
     <input type="password" id="deeplKeyInput" placeholder="xxxxxxxx-xxxx-...:fx" />
     <p class="help">
-      <a href="https://www.deepl.com/pro-api" target="_blank" rel="noopener">DeepL公式サイト</a>
-      の無料プランから取得できます（無料キーは末尾が「:fx」）。DeepLが制限にかかった場合は自動的にGoogle翻訳に切り替わります。
+      <span data-i18n="options_deeplKeyHelpPrefix"></span>
+      <a href="https://www.deepl.com/pro-api" target="_blank" rel="noopener" data-i18n="options_deeplKeyHelpLink">DeepL公式サイト</a>
+      <span data-i18n="options_deeplKeyHelpSuffix">の無料プランから取得できます（無料キーは末尾が「:fx」）。DeepLが制限にかかった場合、Geminiキーが設定されていればGeminiに、それも無ければGoogle翻訳に自動的に切り替わります。</span>
     </p>
 
     <div id="deeplUsageBox" style="margin-top:10px; font-size:12px; color:#333;"></div>
-    <button id="deeplUsageRefreshButton" type="button" style="margin-top:6px; width:auto; padding:5px 12px;">使用量を確認</button>
+    <button id="deeplUsageRefreshButton" type="button" style="margin-top:6px; width:auto; padding:5px 12px;" data-i18n="options_deeplUsageButtonLabel">使用量を確認</button>
+
+    <hr style="margin:16px 0; border:none; border-top:1px solid #d0d0d0;" />
+
+    <span class="fieldLabel" data-i18n="options_geminiKeyLabel">Gemini APIキー</span>
+    <input type="password" id="geminiKeyInput" placeholder="AIza..." />
+    <p class="help">
+      <span data-i18n="options_geminiKeyHelpPrefix"></span>
+      <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener" data-i18n="options_geminiKeyHelpLink">Google AI Studio</a>
+      <span data-i18n="options_geminiKeyHelpMiddle1">で無料発行できます（クレジットカード不要）。</span><strong data-i18n="options_geminiKeyHelpBold">Gemini Appの有料プラン（Gemini Pro等）とは別物</strong><span data-i18n="options_geminiKeyHelpMiddle2">で、ログイン情報は流用できないため、必ずここでAPIキーを発行・入力してください。ゲーム用語やスラングの解釈が機械翻訳より自然になりやすい一方、発言ごとに口調が揺れやすい・処理が少し遅いという特性があります。ダークファンタジー系の過激な単語（Flayedなど）で翻訳がブロックされないよう、セーフティフィルターは緩めに設定しています。失敗時は、DeepLキーが設定されていればDeepLに、それも無ければGoogle翻訳に自動的に切り替わります。</span>
+    </p>
+
+    <span class="fieldLabel" data-i18n="options_geminiToneLabel">Geminiの口調</span>
+    <select id="geminiToneSelect">
+      <option value="auto" data-i18n="options_geminiToneAuto">おまかせ（発言のニュアンスに応じて自然に揺らぐ）</option>
+      <option value="frank" data-i18n="options_geminiToneFrank">フランクに統一（〜だね、〜だよ）</option>
+      <option value="polite" data-i18n="options_geminiTonePolite">丁寧に統一（〜です、〜ます）</option>
+    </select>
   </div>
 
-  <h2>翻訳する言語</h2>
+  <h2 data-i18n="options_languageHeading">翻訳する言語</h2>
   <div class="section">
     <div class="row">
       <div style="flex:1;">
-        <span class="fieldLabel">翻訳元</span>
+        <span class="fieldLabel" data-i18n="options_sourceLabel">翻訳元</span>
         <select id="sourceLangSelect"></select>
       </div>
       <span class="arrow">→</span>
       <div style="flex:1;">
-        <span class="fieldLabel">翻訳先</span>
+        <span class="fieldLabel" data-i18n="options_targetLabel">翻訳先</span>
         <select id="targetLangSelect"></select>
       </div>
     </div>
-    <p class="help">翻訳元を特定の言語に固定すると、その言語の発言だけに翻訳ボタンが表示されるようになります（例：翻訳元を日本語にすると、同じスレッド内の英語の発言にはボタンが出ません）。日本語・中国語・韓国語・ロシア語・タイ語はそれぞれの文字体系で判定し、それ以外（英・仏・独・西・葡・伊・越・尼）はラテン文字の有無による簡易判定です。翻訳先を「自動（ブラウザの言語設定）」にすると、お使いのブラウザの表示言語に合わせて翻訳されます。</p>
+    <p class="help" data-i18n="options_languageHelp">翻訳元を特定の言語に固定すると、その言語の発言だけに翻訳ボタンが表示されるようになります（例：翻訳元を日本語にすると、同じスレッド内の英語の発言にはボタンが出ません）。日本語・中国語・韓国語・ロシア語・タイ語はそれぞれの文字体系で判定し、それ以外（英・仏・独・西・葡・伊・越・尼）はラテン文字の有無による簡易判定です。翻訳先を「自動（ブラウザの言語設定）」にすると、お使いのブラウザの表示言語に合わせて翻訳されます。この言語設定はGeminiにもそのまま反映されます。</p>
   </div>
 
-  <h2>表示ルール</h2>
+  <h2 data-i18n="options_displayRulesHeading">表示ルール</h2>
   <div class="section">
     <label>
       <input type="checkbox" id="skipNativeLanguageToggle" />
-      日本語主体の発言には表示しない
+      <span data-i18n="options_skipNativeLabel">日本語主体の発言には表示しない</span>
     </label>
     <label>
       <input type="checkbox" id="skipShortMessagesToggle" />
-      極端に短い発言には表示しない
+      <span data-i18n="options_skipShortLabel">極端に短い発言には表示しない</span>
     </label>
   </div>
 
+  <script src="i18n.js"></script>
   <script src="options.js"></script>
 </body>
 </html>

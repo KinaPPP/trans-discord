@@ -1,0 +1,72 @@
+{
+  "extName": { "message": "Trans☆Discord" },
+  "extDescription": { "message": "Progressively translates Discord Web chat messages and forum post titles" },
+
+  "popup_extensionEnabledLabel": { "message": "Enable extension" },
+  "popup_extensionEnabledHelp": { "message": "When OFF, nothing works at all, including the blue translate boxes." },
+  "popup_autoTranslateLabel": { "message": "Enable auto-translate" },
+  "popup_autoTranslateHelp": { "message": "Even when ON, only \"Click to translate\" boxes appear right after opening a channel. Clicking any one of them starts auto-translation from that point on. When OFF, only the clicked message gets translated." },
+  "popup_captchaButtonLabel": { "message": "Google Translate not working?" },
+  "popup_captchaHelp": { "message": "You may be facing a \"prove you're not a robot\" check from Google Translate. This button opens a verification page in a new tab (this is unrelated to DeepL/Gemini errors)." },
+  "popup_openOptionsLabel": { "message": "Open advanced settings" },
+  "popup_openOptionsHelp": { "message": "Translation engine, translation languages, and display rules can be configured here." },
+
+  "options_pageTitle": { "message": "Trans☆Discord - Advanced Settings" },
+  "options_pageHeading": { "message": "Trans☆Discord - Advanced Settings" },
+  "options_autoSaveNote": { "message": "Changes here are saved automatically." },
+
+  "options_engineHeading": { "message": "Translation Engine" },
+  "options_providerLabel": { "message": "Translation engine to use" },
+  "options_providerGoogle": { "message": "Google Translate" },
+  "options_providerDeepl": { "message": "DeepL (API key required)" },
+  "options_providerGemini": { "message": "Gemini (API key required, better with gaming slang)" },
+
+  "options_deeplKeyLabel": { "message": "DeepL API Key" },
+  "options_deeplKeyHelpPrefix": { "message": "You can get a free key from the" },
+  "options_deeplKeyHelpLink": { "message": "DeepL official site" },
+  "options_deeplKeyHelpSuffix": { "message": "(free keys end with \":fx\"). If DeepL hits its limit, it automatically falls back to Gemini (if configured), then Google Translate." },
+  "options_deeplUsageButtonLabel": { "message": "Check usage" },
+  "options_deeplUsageEmptyKey": { "message": "Enter an API key to check usage." },
+  "options_deeplUsageChecking": { "message": "Checking…" },
+  "options_deeplUsageResult": { "message": "Usage: $COUNT$ / $LIMIT$ characters ($PERCENT$%, $REMAINING$ remaining)", "placeholders": {
+    "count": { "content": "$1" }, "limit": { "content": "$2" }, "percent": { "content": "$3" }, "remaining": { "content": "$4" }
+  } },
+  "options_deeplUsageError": { "message": "Couldn't fetch usage (please check your API key)." },
+
+  "options_geminiKeyLabel": { "message": "Gemini API Key" },
+  "options_geminiKeyHelpPrefix": { "message": "You can get a free key (no credit card required) from" },
+  "options_geminiKeyHelpLink": { "message": "Google AI Studio" },
+  "options_geminiKeyHelpMiddle1": { "message": "." },
+  "options_geminiKeyHelpBold": { "message": "This is separate from the paid Gemini App plans (Gemini Pro, etc.)" },
+  "options_geminiKeyHelpMiddle2": { "message": ", and login credentials aren't shared, so you must issue and enter an API key here. It tends to handle gaming terms and slang more naturally than machine translation, but tone can vary a bit between messages and it's a little slower. Safety filters are relaxed so dark-fantasy game vocabulary (e.g. \"Flayed\") doesn't get blocked. On failure it automatically falls back to DeepL (if configured), then Google Translate." },
+
+  "options_geminiToneLabel": { "message": "Gemini tone" },
+  "options_geminiToneAuto": { "message": "Let it vary naturally with each message" },
+  "options_geminiToneFrank": { "message": "Always casual" },
+  "options_geminiTonePolite": { "message": "Always polite" },
+
+  "options_languageHeading": { "message": "Translation Languages" },
+  "options_sourceLabel": { "message": "From" },
+  "options_targetLabel": { "message": "To" },
+  "options_languageHelp": { "message": "Fixing the source language means translate buttons only appear on messages in that language (e.g. fixing it to Japanese means English messages in the same thread won't get a button). Japanese, Chinese, Korean, Russian, and Thai are detected by script; other languages (EN/FR/DE/ES/PT/IT/VI/ID) use a simple Latin-script heuristic. Setting the target to \"Auto (browser language)\" translates according to your browser's display language. This language setting also applies to Gemini." },
+
+  "options_displayRulesHeading": { "message": "Display Rules" },
+  "options_skipNativeLabel": { "message": "Don't show for mostly-Japanese messages" },
+  "options_skipShortLabel": { "message": "Don't show for very short messages" },
+
+  "lang_auto": { "message": "Auto-detect" },
+  "lang_browser": { "message": "Auto (browser language)" },
+  "lang_ja": { "message": "Japanese" },
+  "lang_en": { "message": "English" },
+  "lang_zh": { "message": "Chinese" },
+  "lang_ko": { "message": "Korean" },
+  "lang_fr": { "message": "French" },
+  "lang_de": { "message": "German" },
+  "lang_es": { "message": "Spanish" },
+  "lang_pt": { "message": "Portuguese" },
+  "lang_it": { "message": "Italian" },
+  "lang_ru": { "message": "Russian" },
+  "lang_th": { "message": "Thai" },
+  "lang_vi": { "message": "Vietnamese" },
+  "lang_id": { "message": "Indonesian" }
+}

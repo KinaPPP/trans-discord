@@ -1,14 +1,16 @@
 {
   "manifest_version": 3,
-  "name": "トランス☆ディスコ",
-  "version": "1.7.2",
-  "description": "Discord Web版のチャット・フォーラムタイトルを逐次自動翻訳します",
+  "name": "__MSG_extName__",
+  "version": "1.10.0",
+  "description": "__MSG_extDescription__",
+  "default_locale": "ja",
   "permissions": ["storage"],
   "host_permissions": [
     "https://discord.com/*",
     "https://translate.googleapis.com/*",
     "https://api-free.deepl.com/*",
-    "https://api.deepl.com/*"
+    "https://api.deepl.com/*",
+    "https://generativelanguage.googleapis.com/*"
   ],
   "icons": {
     "16": "icons/icon16.png",

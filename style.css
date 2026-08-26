@@ -5,10 +5,14 @@
   line-height: 1.5;
   margin-top: 5px;
   padding: 5px 10px;
-  background-color: rgba(255, 255, 255, 0.08);
+  /* 白ベースの薄い背景だとライトテーマで見えなくなるため、
+     どちらのテーマでも視認できる青系の薄い背景に統一 */
+  background-color: rgba(88, 101, 242, 0.12);
   border-left: 3px solid #5865F2;
   border-radius: 4px;
-  color: #e3e6e8;
+  /* Discord自身のCSS変数を使うことで、ダーク/ライトテーマ双方で
+     自動的に読みやすい文字色になる（未対応環境向けにフォールバックも指定） */
+  color: var(--text-default, #e3e6e8);
   white-space: pre-wrap;
   word-break: break-word;
 }
@@ -23,7 +27,7 @@
   background-color: rgba(88, 101, 242, 0.18);
   border-left: 2px solid #5865F2;
   border-radius: 3px;
-  color: #dbe0ff;
+  color: var(--text-default, #dbe0ff);
   display: block;
   width: 100%;
   flex-basis: 100%;

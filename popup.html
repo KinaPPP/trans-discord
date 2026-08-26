@@ -69,28 +69,29 @@
 
   <label>
     <input type="checkbox" id="extensionEnabledToggle" />
-    拡張機能を有効にする
+    <span data-i18n="popup_extensionEnabledLabel">拡張機能を有効にする</span>
   </label>
-  <p>OFFにすると、青いエリアの表示も含めて一切動作しなくなります。</p>
+  <p data-i18n="popup_extensionEnabledHelp">OFFにすると、青いエリアの表示も含めて一切動作しなくなります。</p>
 
   <hr />
 
   <label>
     <input type="checkbox" id="autoTranslateToggle" />
-    自動翻訳を有効にする
+    <span data-i18n="popup_autoTranslateLabel">自動翻訳を有効にする</span>
   </label>
-  <p>ONの場合も、開いた直後は「クリックして翻訳」が並ぶだけです。どれか1つをクリックすると、そこから自動翻訳が始まります。OFFならクリックした発言だけ翻訳されます。</p>
+  <p data-i18n="popup_autoTranslateHelp">ONの場合も、開いた直後は「クリックして翻訳」が並ぶだけです。どれか1つをクリックすると、そこから自動翻訳が始まります。OFFならクリックした発言だけ翻訳されます。</p>
 
   <hr />
 
-  <button id="captchaButton" type="button">翻訳が出ない場合はこちら</button>
-  <p>Google翻訳から「ロボットではありません」認証を求められている可能性があります。ボタンを押すと確認用ページが新しいタブで開きます。</p>
+  <button id="captchaButton" type="button" data-i18n="popup_captchaButtonLabel">Google翻訳が出ない場合はこちら</button>
+  <p data-i18n="popup_captchaHelp">Google翻訳から「ロボットではありません」認証を求められている可能性があります。ボタンを押すと確認用ページが新しいタブで開きます（DeepL/Geminiのエラーには関係ありません）。</p>
 
   <hr />
 
-  <a href="#" id="openOptionsLink" class="linkButton">詳細設定を開く</a>
-  <p>翻訳エンジン、翻訳する言語、表示ルールなどはこちらから設定できます。</p>
+  <a href="#" id="openOptionsLink" class="linkButton" data-i18n="popup_openOptionsLabel">詳細設定を開く</a>
+  <p data-i18n="popup_openOptionsHelp">翻訳エンジン、翻訳する言語、表示ルールなどはこちらから設定できます。</p>
 
+  <script src="i18n.js"></script>
   <script src="popup.js"></script>
 </body>
 </html>

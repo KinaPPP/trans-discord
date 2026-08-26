@@ -3,41 +3,24 @@ const queue = [];
 let isRunning = false;
 let consecutiveFailures = 0;
 
-// 翻訳エンジン・言語ペアの設定（オプションページから変更可能）
-let translationProvider = "google"; // "google" | "deepl"
-let deeplApiKey = "";
-let sourceLang = "auto"; // "auto" または言語コード（例: "en"）
-let targetLang = "ja"; // "browser"（ブラウザの言語設定）または言語コード
-
 const SETTINGS_DEFAULTS = {
-  translationProvider: "google",
+  translationProvider: "google", // "google" | "deepl" | "gemini"
   deeplApiKey: "",
-  sourceLang: "auto",
-  targetLang: "ja",
+  geminiApiKey: "",
+  geminiTone: "auto", // "auto" | "frank" | "polite"
+  sourceLang: "auto", // "auto" または言語コード（例: "en"）
+  targetLang: "ja", // "browser"（ブラウザの言語設定）または言語コード
 };
 
-chrome.storage.local.get(SETTINGS_DEFAULTS, (result) => {
-  translationProvider = result.translationProvider;
-  deeplApiKey = result.deeplApiKey;
-  sourceLang = result.sourceLang;
-  targetLang = result.targetLang;
-});
-
-chrome.storage.onChanged.addListener((changes, area) => {
-  if (area !== "local") return;
-  if (changes.translationProvider) {
-    translationProvider = changes.translationProvider.newValue;
-  }
-  if (changes.deeplApiKey) {
-    deeplApiKey = changes.deeplApiKey.newValue;
-  }
-  if (changes.sourceLang) {
-    sourceLang = changes.sourceLang.newValue;
-  }
-  if (changes.targetLang) {
-    targetLang = changes.targetLang.newValue;
-  }
-});
+// Manifest V3のService Workerは操作が無いと終了し、次のメッセージで再起動する。
+// 起動時に一度だけ設定を読んでキャッシュする方式だと、再起動直後の読み込みが
+// 完了する前にリクエストが来た場合に古い/初期値の設定で処理されてしまうため、
+// 毎回のリクエストごとに chrome.storage.local から読み直す。
+function getSettings() {
+  return new Promise((resolve) => {
+    chrome.storage.local.get(SETTINGS_DEFAULTS, resolve);
+  });
+}
 
 const BASE_DELAY = 250;
 const MAX_DELAY = 30000; // 最大30秒まで間隔を広げる
@@ -48,7 +31,7 @@ function getDelay() {
 }
 
 // "browser"指定時はブラウザのUI言語（例: "ja-JP" → "ja"）を実際の翻訳先言語として使う
-function resolveTargetLang() {
+function resolveTargetLang(targetLang) {
   if (targetLang === "browser") {
     const uiLang = chrome.i18n.getUILanguage() || "ja";
     return uiLang.split("-")[0];
@@ -56,9 +39,9 @@ function resolveTargetLang() {
   return targetLang;
 }
 
-async function translateWithGoogle(text) {
-  const tl = resolveTargetLang();
-  const sl = sourceLang === "auto" ? "auto" : sourceLang;
+async function translateWithGoogle(text, settings) {
+  const tl = resolveTargetLang(settings.targetLang);
+  const sl = settings.sourceLang === "auto" ? "auto" : settings.sourceLang;
   const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${sl}&tl=${tl}&dt=t&q=${encodeURIComponent(text)}`;
   const res = await fetch(url, {
     referrer: "https://translate.google.com/",
@@ -75,15 +58,16 @@ async function translateWithGoogle(text) {
   throw new Error("UNEXPECTED_FORMAT");
 }
 
-async function translateWithDeepL(text, apiKey) {
+async function translateWithDeepL(text, settings) {
+  const apiKey = settings.deeplApiKey;
   // 無料キーは末尾が ":fx"。エンドポイントのホストが異なる
   const isFree = apiKey.endsWith(":fx");
   const base = isFree ? "https://api-free.deepl.com" : "https://api.deepl.com";
 
-  const tl = resolveTargetLang().toUpperCase();
+  const tl = resolveTargetLang(settings.targetLang).toUpperCase();
   const params = { text, target_lang: tl };
-  if (sourceLang !== "auto") {
-    params.source_lang = sourceLang.toUpperCase();
+  if (settings.sourceLang !== "auto") {
+    params.source_lang = settings.sourceLang.toUpperCase();
   }
 
   const res = await fetch(`${base}/v2/translate`, {
@@ -104,19 +88,129 @@ async function translateWithDeepL(text, apiKey) {
   throw new Error("DEEPL_UNEXPECTED_FORMAT");
 }
 
-async function translateText(text) {
-  if (translationProvider === "deepl" && deeplApiKey) {
+// 言語コード → 日本語での言語名（Geminiへの指示文で使う）
+const LANG_NAMES = {
+  ja: "日本語",
+  en: "英語",
+  zh: "中国語",
+  ko: "韓国語",
+  fr: "フランス語",
+  de: "ドイツ語",
+  es: "スペイン語",
+  pt: "ポルトガル語",
+  it: "イタリア語",
+  ru: "ロシア語",
+  th: "タイ語",
+  vi: "ベトナム語",
+  id: "インドネシア語",
+};
+
+const GEMINI_MODEL = "gemini-2.5-flash-lite";
+
+function buildGeminiSystemPrompt(settings) {
+  const targetName = LANG_NAMES[resolveTargetLang(settings.targetLang)] || "日本語";
+  const sourceInstruction =
+    settings.sourceLang !== "auto" && LANG_NAMES[settings.sourceLang]
+      ? `入力された【${LANG_NAMES[settings.sourceLang]}】のテキストを、`
+      : "入力されたテキスト（言語は自動判別）を、";
+
+  let toneInstruction = "";
+  if (settings.geminiTone === "frank") {
+    toneInstruction = "親しみやすい会話調（〜だね、〜だよ、〜かも）で統一してください。";
+  } else if (settings.geminiTone === "polite") {
+    toneInstruction = "落ち着いた敬体（〜です、〜ます）で統一してください。";
+  }
+
+  return (
+    `あなたはゲームコミュニティ専門の優秀な翻訳者です。${sourceInstruction}` +
+    `自然な【${targetName}】に翻訳してください。ゲーム用語、スラング、ネットミームの文脈を正しく汲み取ってください。` +
+    `${toneInstruction}` +
+    `前置きや解説、挨拶は一切出力せず、翻訳結果のテキストのみを出力してください。`
+  );
+}
+
+// ゲームコミュニティの会話には暴力・グロテスク表現を含む用語が
+// 日常的に出てくる（例: Flayed, Martyr, kill 等）ため、翻訳が
+// 意図せずセーフティフィルターでブロックされないよう緩和しておく
+const GEMINI_SAFETY_SETTINGS = [
+  { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
+  { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
+  { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
+  { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" },
+];
+
+async function translateWithGemini(text, settings) {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${settings.geminiApiKey}`;
+
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      contents: [{ parts: [{ text }] }],
+      systemInstruction: { parts: [{ text: buildGeminiSystemPrompt(settings) }] },
+      safetySettings: GEMINI_SAFETY_SETTINGS,
+      generationConfig: {
+        temperature: 0.2, // 翻訳のブレを抑える
+        maxOutputTokens: 1000,
+      },
+    }),
+  });
+
+  if (!res.ok) {
+    const errorBody = await res.text();
+    console.error("[トランス☆ディスコ] Gemini HTTPエラー:", res.status, errorBody);
+    throw new Error(`GEMINI_HTTP_${res.status}`);
+  }
+
+  const data = await res.json();
+
+  // parts配列内で最初に空でないtextを持つ要素を採用する
+  // （thinking機能等でparts[0]が空/別内容になるケースへの対策）
+  const parts = data.candidates?.[0]?.content?.parts || [];
+  const textPart = parts.find((p) => p.text && p.text.trim().length > 0);
+  if (textPart) {
+    return textPart.text.trim();
+  }
+
+  const finishReason = data.candidates?.[0]?.finishReason;
+  if (finishReason) {
+    console.warn("[トランス☆ディスコ] Gemini終了ステータス:", finishReason, data);
+  }
+  throw new Error(`GEMINI_EMPTY_RESPONSE${finishReason ? `_${finishReason}` : ""}`);
+}
+
+async function translateText(text, settings) {
+  console.log("[トランス☆ディスコ] 使用する翻訳エンジン:", settings.translationProvider);
+
+  // 選択中のエンジンを最優先に、キーが設定されている他の有料エンジンを予備として並べ、
+  // 最後にキー不要のGoogle翻訳を保険として置く連鎖を組み立てる
+  const chain = [];
+
+  if (settings.translationProvider === "deepl" && settings.deeplApiKey) {
+    chain.push({ name: "DeepL", fn: () => translateWithDeepL(text, settings) });
+  } else if (settings.translationProvider === "gemini" && settings.geminiApiKey) {
+    chain.push({ name: "Gemini", fn: () => translateWithGemini(text, settings) });
+  }
+
+  if (settings.translationProvider !== "deepl" && settings.deeplApiKey) {
+    chain.push({ name: "DeepL", fn: () => translateWithDeepL(text, settings) });
+  }
+  if (settings.translationProvider !== "gemini" && settings.geminiApiKey) {
+    chain.push({ name: "Gemini", fn: () => translateWithGemini(text, settings) });
+  }
+
+  chain.push({ name: "Google翻訳", fn: () => translateWithGoogle(text, settings) });
+
+  let lastError;
+  for (const { name, fn } of chain) {
     try {
-      return await translateWithDeepL(text, deeplApiKey);
-    } catch (deeplErr) {
-      console.log(
-        "[トランス☆ディスコ] DeepL失敗、Google翻訳にフォールバック:",
-        deeplErr.message
-      );
-      return await translateWithGoogle(text);
+      return await fn();
+    } catch (err) {
+      lastError = err;
+      console.log(`[トランス☆ディスコ] ${name}失敗、次のエンジンを試します:`, err.message);
     }
   }
-  return await translateWithGoogle(text);
+  throw lastError;
 }
 
 async function processQueue() {
@@ -125,7 +219,9 @@ async function processQueue() {
 
   while (queue.length > 0) {
     const { text, sendResponse } = queue.shift();
-    const cacheKey = `${translationProvider}:${sourceLang}:${targetLang}:${text}`;
+    // リクエストのたびに最新の設定を読み直す（Service Worker再起動直後のレース対策）
+    const settings = await getSettings();
+    const cacheKey = `${settings.translationProvider}:${settings.sourceLang}:${settings.targetLang}:${settings.geminiTone}:${text}`;
 
     if (cache.has(cacheKey)) {
       sendResponse({ success: true, text: cache.get(cacheKey) });
@@ -133,7 +229,7 @@ async function processQueue() {
     }
 
     try {
-      const translatedText = await translateText(text);
+      const translatedText = await translateText(text, settings);
       cache.set(cacheKey, translatedText);
       sendResponse({ success: true, text: translatedText });
       consecutiveFailures = 0; // 成功したらリセット
