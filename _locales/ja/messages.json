@@ -50,7 +50,7 @@
   "options_geminiToneCustom": { "message": "カスタム（下記に自由記述）" },
   "options_geminiCustomPromptLabel": { "message": "カスタムプロンプト" },
   "options_geminiCustomPromptPlaceholder": { "message": "例：語尾を「〜なのだ」で統一してください" },
-  "options_geminiCustomPromptHelp": { "message": "内容自体は正確に翻訳させつつ、口調だけを変える指示を書くのがおすすめです（例：「内容は正確に、語尾だけ〜なのだ、にしてください」）。過激な内容への変更依頼などは無視される場合があります。" },
+  "options_geminiCustomPromptHelp": { "message": "「〜にしてください」だけだと弱いことがあります。【最重要ルール】と変換例を1〜2個添えると効果的です（例：「【最重要ルール】文末を必ず『〜なのだ』にする。【変換例】This is great -> これはすごいのだ」）。過激な内容への変更依頼などは無視される場合があります。" },
 
   "options_languageHeading": { "message": "翻訳する言語" },
   "options_sourceLabel": { "message": "翻訳元" },

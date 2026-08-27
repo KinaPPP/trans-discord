@@ -1,2 +1,10 @@
-# Auto detect text files and perform LF normalization
-* text=auto
+# テキストファイルは常にLFで統一し、Windows/Mac間での改行コード変換による
+# 差分・警告が出ないようにする
+* text=auto eol=lf
+
+# 画像などのバイナリファイルは変換対象外にする
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary

@@ -50,7 +50,7 @@
   "options_geminiToneCustom": { "message": "Custom (write your own below)" },
   "options_geminiCustomPromptLabel": { "message": "Custom prompt" },
   "options_geminiCustomPromptPlaceholder": { "message": "e.g. End every sentence with \"nya\"" },
-  "options_geminiCustomPromptHelp": { "message": "It works best if you ask it to keep the content accurate and only change the tone (e.g. \"Keep the meaning accurate, just end sentences with 'nya'\"). Requests for extreme content changes may be ignored." },
+  "options_geminiCustomPromptHelp": { "message": "A plain request like \"do X\" is sometimes too weak. Adding a [MOST IMPORTANT RULE] plus 1-2 conversion examples works much better (e.g. \"[MOST IMPORTANT RULE] Always end sentences with 'nya'. [Example] This is great -> This is great, nya\"). Requests for extreme content changes may be ignored." },
 
   "options_languageHeading": { "message": "Translation Languages" },
   "options_sourceLabel": { "message": "From" },

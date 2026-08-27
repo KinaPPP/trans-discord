@@ -41,6 +41,7 @@ function resolveTargetLang(targetLang) {
 }
 
 async function translateWithGoogle(text, settings) {
+  console.log("[トランス☆ディスコ] Google翻訳へ送信します。");
   const tl = resolveTargetLang(settings.targetLang);
   const sl = settings.sourceLang === "auto" ? "auto" : settings.sourceLang;
   const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${sl}&tl=${tl}&dt=t&q=${encodeURIComponent(text)}`;
@@ -60,6 +61,7 @@ async function translateWithGoogle(text, settings) {
 }
 
 async function translateWithDeepL(text, settings) {
+  console.log("[トランス☆ディスコ] DeepLへ送信します。");
   const apiKey = settings.deeplApiKey;
   // 無料キーは末尾が ":fx"。エンドポイントのホストが異なる
   const isFree = apiKey.endsWith(":fx");
@@ -106,14 +108,31 @@ const LANG_NAMES = {
   id: "インドネシア語",
 };
 
-const GEMINI_MODEL = "gemini-2.5-flash-lite";
+const GEMINI_MODEL = "gemini-3.5-flash-lite"; // gemini-2.5-flash-liteは新規ユーザー向け提供終了のため移行
 
 const TONE_PRESETS = {
-  frank: "親しみやすい会話調（〜だね、〜だよ、〜かも）で統一してください。",
-  polite: "落ち着いた敬体（〜です、〜ます）で統一してください。",
-  cat: "すべての文末を「〜にゃ」「〜にゃん」等の語尾にし、猫のような口調で統一してください（内容自体は真面目に正確に翻訳しつつ、口調だけを猫っぽくしてください）。",
-  ojousama: "上品なお嬢様口調（〜ですわ、〜ですのよ、〜ますわ）で統一してください（内容自体は真面目に正確に翻訳しつつ、口調だけをお嬢様風にしてください）。",
-  kansai: "関西弁（〜やで、〜やねん、〜せやから）で統一してください（内容自体は真面目に正確に翻訳しつつ、口調だけを関西弁にしてください）。",
+  frank: "文末を「〜だね」「〜だよ」「〜かも」など、親しみやすい会話調に必ず統一してください。",
+  polite: "文末を「〜です」「〜ます」など、落ち着いた敬体に必ず統一してください。",
+  cat: `【最重要ルール】
+・文末・語尾は必ず「〜にゃ」「〜だにゃ」「〜かにゃ？」「〜にゃ〜」に変換してください。
+・すべての文を例外なく猫口調にしてください。内容の意味は変えないでください。
+
+【変換の例】
+・This is a bug -> これはバグだにゃ！
+・I cleared it without issues -> 問題なくクリアできたにゃ〜
+・What do you think? -> どう思うかにゃ？`,
+  ojousama: `【最重要ルール】
+・優雅なお嬢様言葉（〜ですわ、〜ますわ、〜ですの？、〜よろしくてよ）に必ず変換してください。内容の意味は変えないでください。
+
+【変換の例】
+・This is a bug -> こちらはバグですわ！
+・I cleared it -> わたくし、クリアいたしましたわ`,
+  kansai: `【最重要ルール】
+・語尾やイントネーションを必ず関西弁（「〜やで」「〜やねん」「せやから」等）に変換してください。内容の意味は変えないでください。
+
+【変換の例】
+・This is a bug -> これバグやで！
+・I cleared it without issues -> 問題なくクリアできたわ`,
 };
 
 function buildGeminiSystemPrompt(settings) {
@@ -130,12 +149,21 @@ function buildGeminiSystemPrompt(settings) {
     toneInstruction = TONE_PRESETS[settings.geminiTone];
   }
 
+  // 口調指示はプロンプトの一番最後（AIが最も強く意識する位置）に置く。
+  // 「正確な翻訳者として振る舞え」という指示と混ぜると、AIが
+  // 標準的で無難な口調に補正してしまい、口調指示が無視されやすくなるため。
   return (
     `あなたはゲームコミュニティ専門の優秀な翻訳者です。${sourceInstruction}` +
     `自然な【${targetName}】に翻訳してください。ゲーム用語、スラング、ネットミームの文脈を正しく汲み取ってください。` +
-    `${toneInstruction}` +
-    `前置きや解説、挨拶は一切出力せず、翻訳結果のテキストのみを出力してください。`
+    `前置きや解説、挨拶は一切出力せず、翻訳結果のテキストのみを出力してください。` +
+    (toneInstruction ? `\n\n${toneInstruction}` : "")
   );
+}
+
+function resolveGeminiTemperature(settings) {
+  // 標準口調（おまかせ）は正確さ優先で低め、口調変更ありの場合は
+  // 崩しを許容するため少し引き上げる
+  return settings.geminiTone === "auto" ? 0.2 : 0.4;
 }
 
 // ゲームコミュニティの会話には暴力・グロテスク表現を含む用語が
@@ -150,16 +178,25 @@ const GEMINI_SAFETY_SETTINGS = [
 
 async function translateWithGemini(text, settings) {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${settings.geminiApiKey}`;
+  const systemPrompt = buildGeminiSystemPrompt(settings);
+
+  console.log(
+    "[トランス☆ディスコ] Geminiへ送信します。口調設定:",
+    settings.geminiTone,
+    "/ 実際のシステムプロンプト:",
+    systemPrompt
+  );
 
   const res = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       contents: [{ parts: [{ text }] }],
-      systemInstruction: { parts: [{ text: buildGeminiSystemPrompt(settings) }] },
+      systemInstruction: { parts: [{ text: systemPrompt }] },
       safetySettings: GEMINI_SAFETY_SETTINGS,
       generationConfig: {
-        temperature: 0.2, // 翻訳のブレを抑える
+        // 標準は正確さ優先で低め、口調プリセット使用時は崩しを許容するため引き上げる
+        temperature: resolveGeminiTemperature(settings),
         maxOutputTokens: 1000,
       },
     }),
@@ -232,7 +269,15 @@ async function processQueue() {
     const settings = await getSettings();
     const cacheKey = `${settings.translationProvider}:${settings.sourceLang}:${settings.targetLang}:${settings.geminiTone}:${settings.geminiCustomPrompt}:${text}`;
 
+    console.log(
+      "[トランス☆ディスコ] キュー処理開始 / エンジン:",
+      settings.translationProvider,
+      "/ 口調:",
+      settings.geminiTone
+    );
+
     if (cache.has(cacheKey)) {
+      console.log("[トランス☆ディスコ] キャッシュから返答（新規リクエストは送っていません）");
       sendResponse({ success: true, text: cache.get(cacheKey) });
       continue;
     }
