@@ -152,3 +152,6 @@ deeplUsageRefreshButton.addEventListener("click", refreshDeeplUsage);
 chrome.storage.local.get(DEFAULT_SETTINGS, (result) => {
   if (result.deeplApiKey) refreshDeeplUsage();
 });
+
+document.getElementById("versionLabel").textContent =
+  "ver " + chrome.runtime.getManifest().version;

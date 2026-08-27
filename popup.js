@@ -30,3 +30,6 @@ document.getElementById("openOptionsLink").addEventListener("click", (e) => {
   e.preventDefault();
   chrome.runtime.openOptionsPage();
 });
+
+document.getElementById("versionLabel").textContent =
+  "ver " + chrome.runtime.getManifest().version;
