@@ -1,4 +1,61 @@
+// メモリ上のMapをメインに使いつつ、Service Worker再起動をまたいでも
+// ブラウザを閉じるまでは保持されるよう chrome.storage.session と同期する。
+// 件数上限を設けたLRU（あまり使われていない古いものから捨てる）方式。
 const cache = new Map();
+const CACHE_STORAGE_KEY = "translationCache";
+const CACHE_LIMIT = 1000;
+let persistTimer = null;
+
+async function loadCacheFromSession() {
+  try {
+    const result = await chrome.storage.session.get(CACHE_STORAGE_KEY);
+    const saved = result[CACHE_STORAGE_KEY];
+    if (saved) {
+      // 保存時の順序（古い→新しい）をそのままMapの挿入順として復元する
+      Object.entries(saved).forEach(([key, value]) => cache.set(key, value));
+    }
+  } catch (err) {
+    console.warn("[トランス☆ディスコ] キャッシュの復元に失敗:", err);
+  }
+}
+// 起動直後からのリクエストが復元前にキャッシュを見に行かないよう、
+// この読み込み完了をprocessQueue側で待ってから処理を始める
+const cacheReady = loadCacheFromSession();
+
+function persistCache() {
+  clearTimeout(persistTimer);
+  // 短時間に連続する書き込みをまとめるための簡易デバウンス
+  persistTimer = setTimeout(() => {
+    chrome.storage.session
+      .set({ [CACHE_STORAGE_KEY]: Object.fromEntries(cache) })
+      .catch((err) => console.warn("[トランス☆ディスコ] キャッシュの保存に失敗:", err));
+  }, 1000);
+}
+
+function getCache(key) {
+  if (!cache.has(key)) return undefined;
+  const value = cache.get(key);
+  // アクセスされたものを最新扱いにする（Mapの末尾に移動＝LRUの「直近使用」扱い）
+  cache.delete(key);
+  cache.set(key, value);
+  return value;
+}
+
+function setCache(key, value) {
+  cache.set(key, value);
+  while (cache.size > CACHE_LIMIT) {
+    const oldestKey = cache.keys().next().value;
+    cache.delete(oldestKey);
+  }
+  persistCache();
+}
+
+function clearCache() {
+  cache.clear();
+  clearTimeout(persistTimer);
+  return chrome.storage.session.remove(CACHE_STORAGE_KEY);
+}
+
 const queue = [];
 let isRunning = false;
 let consecutiveFailures = 0;
@@ -263,6 +320,8 @@ async function processQueue() {
   if (isRunning || queue.length === 0) return;
   isRunning = true;
 
+  await cacheReady; // Service Worker起動直後、セッションからのキャッシュ復元を待つ
+
   while (queue.length > 0) {
     const { text, sendResponse } = queue.shift();
     // リクエストのたびに最新の設定を読み直す（Service Worker再起動直後のレース対策）
@@ -276,15 +335,16 @@ async function processQueue() {
       settings.geminiTone
     );
 
-    if (cache.has(cacheKey)) {
+    const cachedValue = getCache(cacheKey);
+    if (cachedValue !== undefined) {
       console.log("[トランス☆ディスコ] キャッシュから返答（新規リクエストは送っていません）");
-      sendResponse({ success: true, text: cache.get(cacheKey) });
+      sendResponse({ success: true, text: cachedValue });
       continue;
     }
 
     try {
       const translatedText = await translateText(text, settings);
-      cache.set(cacheKey, translatedText);
+      setCache(cacheKey, translatedText);
       sendResponse({ success: true, text: translatedText });
       consecutiveFailures = 0; // 成功したらリセット
     } catch (err) {
@@ -303,6 +363,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === "translate") {
     queue.push({ text: request.text, sendResponse });
     processQueue();
+    return true;
+  }
+  if (request.action === "clearCache") {
+    clearCache()
+      .then(() => sendResponse({ success: true }))
+      .catch((err) => sendResponse({ success: false, error: err.message }));
     return true;
   }
 });

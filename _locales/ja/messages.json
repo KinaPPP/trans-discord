@@ -10,6 +10,9 @@
   "popup_captchaHelp": { "message": "Google翻訳から「ロボットではありません」認証を求められている可能性があります。ボタンを押すと確認用ページが新しいタブで開きます（DeepL/Geminiのエラーには関係ありません）。" },
   "popup_openOptionsLabel": { "message": "詳細設定を開く" },
   "popup_openOptionsHelp": { "message": "翻訳エンジン、翻訳する言語、表示ルールなどはこちらから設定できます。" },
+  "popup_clearCacheButtonLabel": { "message": "古い翻訳の削除" },
+  "popup_clearCacheHelp": { "message": "これまでに翻訳した内容の一時保存（キャッシュ）を消去します。次に同じ発言を開いた際は再度翻訳が行われます。" },
+  "popup_clearCacheDone": { "message": "削除しました。" },
 
   "options_pageTitle": { "message": "トランス☆ディスコ - 詳細設定" },
   "options_pageHeading": { "message": "トランス☆ディスコ - 詳細設定" },

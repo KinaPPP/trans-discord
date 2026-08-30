@@ -10,6 +10,9 @@
   "popup_captchaHelp": { "message": "You may be facing a \"prove you're not a robot\" check from Google Translate. This button opens a verification page in a new tab (this is unrelated to DeepL/Gemini errors)." },
   "popup_openOptionsLabel": { "message": "Open advanced settings" },
   "popup_openOptionsHelp": { "message": "Translation engine, translation languages, and display rules can be configured here." },
+  "popup_clearCacheButtonLabel": { "message": "Clear cached translations" },
+  "popup_clearCacheHelp": { "message": "Clears the temporary cache of previously translated text. The same message will be translated again the next time you view it." },
+  "popup_clearCacheDone": { "message": "Cleared." },
 
   "options_pageTitle": { "message": "Trans☆Discord - Advanced Settings" },
   "options_pageHeading": { "message": "Trans☆Discord - Advanced Settings" },

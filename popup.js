@@ -33,3 +33,22 @@ document.getElementById("openOptionsLink").addEventListener("click", (e) => {
 
 document.getElementById("versionLabel").textContent =
   "ver " + chrome.runtime.getManifest().version;
+
+const clearCacheButton = document.getElementById("clearCacheButton");
+const clearCacheHelp = document.getElementById("clearCacheHelp");
+const clearCacheHelpDefault = clearCacheHelp.textContent;
+
+clearCacheButton.addEventListener("click", () => {
+  clearCacheButton.disabled = true;
+  chrome.runtime.sendMessage({ action: "clearCache" }, (response) => {
+    if (response && response.success) {
+      clearCacheHelp.textContent = chrome.i18n.getMessage("popup_clearCacheDone");
+      setTimeout(() => {
+        clearCacheHelp.textContent = clearCacheHelpDefault;
+        clearCacheButton.disabled = false;
+      }, 2000);
+    } else {
+      clearCacheButton.disabled = false;
+    }
+  });
+});
