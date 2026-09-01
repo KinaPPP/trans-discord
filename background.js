@@ -233,9 +233,30 @@ const GEMINI_SAFETY_SETTINGS = [
   { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" },
 ];
 
+// Geminiの無料枠は「1分あたり15リクエスト」が上限。429を受け取ってから
+// リトライ待ちするのは翻訳表示が遅くなるだけなので、直近60秒の送信回数を
+// 自分で数えておき、上限に近づいたら最初から他のエンジンに回す。
+const GEMINI_RATE_WINDOW_MS = 60_000;
+const GEMINI_RATE_LIMIT_SAFE = 12; // 実際の上限（15/分）より少し手前で止める
+let geminiRequestTimestamps = [];
+
+function canUseGeminiNow() {
+  const now = Date.now();
+  geminiRequestTimestamps = geminiRequestTimestamps.filter(
+    (t) => now - t < GEMINI_RATE_WINDOW_MS
+  );
+  return geminiRequestTimestamps.length < GEMINI_RATE_LIMIT_SAFE;
+}
+
+function recordGeminiRequest() {
+  geminiRequestTimestamps.push(Date.now());
+}
+
 async function translateWithGemini(text, settings) {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${settings.geminiApiKey}`;
   const systemPrompt = buildGeminiSystemPrompt(settings);
+
+  recordGeminiRequest();
 
   console.log(
     "[トランス☆ディスコ] Geminiへ送信します。口調設定:",
@@ -285,29 +306,48 @@ async function translateWithGemini(text, settings) {
 async function translateText(text, settings) {
   console.log("[トランス☆ディスコ] 使用する翻訳エンジン:", settings.translationProvider);
 
+  const providers = {
+    google: {
+      id: "google",
+      name: "Google翻訳",
+      available: true,
+      fn: () => translateWithGoogle(text, settings),
+    },
+    deepl: {
+      id: "deepl",
+      name: "DeepL",
+      available: Boolean(settings.deeplApiKey),
+      fn: () => translateWithDeepL(text, settings),
+    },
+    gemini: {
+      id: "gemini",
+      name: "Gemini",
+      available: Boolean(settings.geminiApiKey),
+      // レート制限に近い場合は、実際に送って429を受け取るより先にスキップする
+      fn: () => {
+        if (!canUseGeminiNow()) {
+          console.log(
+            "[トランス☆ディスコ] Geminiのレート制限（1分15回）に近いため、送信せずスキップします"
+          );
+          throw new Error("GEMINI_RATE_LIMIT_GUARD");
+        }
+        return translateWithGemini(text, settings);
+      },
+    },
+  };
+
   // 選択中のエンジンを最優先に、キーが設定されている他の有料エンジンを予備として並べ、
-  // 最後にキー不要のGoogle翻訳を保険として置く連鎖を組み立てる
-  const chain = [];
-
-  if (settings.translationProvider === "deepl" && settings.deeplApiKey) {
-    chain.push({ name: "DeepL", fn: () => translateWithDeepL(text, settings) });
-  } else if (settings.translationProvider === "gemini" && settings.geminiApiKey) {
-    chain.push({ name: "Gemini", fn: () => translateWithGemini(text, settings) });
-  }
-
-  if (settings.translationProvider !== "deepl" && settings.deeplApiKey) {
-    chain.push({ name: "DeepL", fn: () => translateWithDeepL(text, settings) });
-  }
-  if (settings.translationProvider !== "gemini" && settings.geminiApiKey) {
-    chain.push({ name: "Gemini", fn: () => translateWithGemini(text, settings) });
-  }
-
-  chain.push({ name: "Google翻訳", fn: () => translateWithGoogle(text, settings) });
+  // 最後にキー不要のGoogle翻訳を保険として置く連鎖を組み立てる（重複は除去）
+  const order = [settings.translationProvider, "deepl", "gemini", "google"].filter(
+    (id, index, arr) => arr.indexOf(id) === index
+  );
+  const chain = order.map((id) => providers[id]).filter((p) => p && p.available);
 
   let lastError;
-  for (const { name, fn } of chain) {
+  for (const { id, name, fn } of chain) {
     try {
-      return await fn();
+      const translatedText = await fn();
+      return { engine: id, text: translatedText };
     } catch (err) {
       lastError = err;
       console.log(`[トランス☆ディスコ] ${name}失敗、次のエンジンを試します:`, err.message);
@@ -326,7 +366,12 @@ async function processQueue() {
     const { text, sendResponse } = queue.shift();
     // リクエストのたびに最新の設定を読み直す（Service Worker再起動直後のレース対策）
     const settings = await getSettings();
-    const cacheKey = `${settings.translationProvider}:${settings.sourceLang}:${settings.targetLang}:${settings.geminiTone}:${settings.geminiCustomPrompt}:${text}`;
+    // ※ エンジンIDをキーに含める。フォールバックで代打翻訳された結果を
+    //   「選択中エンジンの結果」として固定してしまわないよう、書き込み時は
+    //   実際に翻訳したエンジンのキーを使う（下記参照）。
+    const buildCacheKey = (engineId) =>
+      `${engineId}:${settings.sourceLang}:${settings.targetLang}:${settings.geminiTone}:${settings.geminiCustomPrompt}:${text}`;
+    const primaryCacheKey = buildCacheKey(settings.translationProvider);
 
     console.log(
       "[トランス☆ディスコ] キュー処理開始 / エンジン:",
@@ -335,7 +380,7 @@ async function processQueue() {
       settings.geminiTone
     );
 
-    const cachedValue = getCache(cacheKey);
+    const cachedValue = getCache(primaryCacheKey);
     if (cachedValue !== undefined) {
       console.log("[トランス☆ディスコ] キャッシュから返答（新規リクエストは送っていません）");
       sendResponse({ success: true, text: cachedValue });
@@ -343,8 +388,18 @@ async function processQueue() {
     }
 
     try {
-      const translatedText = await translateText(text, settings);
-      setCache(cacheKey, translatedText);
+      const { engine, text: translatedText } = await translateText(text, settings);
+      if (engine === settings.translationProvider) {
+        setCache(primaryCacheKey, translatedText);
+      } else {
+        // フォールバックで別エンジンが翻訳した場合は、そのエンジン自身の結果として
+        // 保存する（＝選択中エンジンのキャッシュにはしない）。次回はレート制限に
+        // 余裕があれば、改めて選択中エンジンで翻訳し直される。
+        console.log(
+          `[トランス☆ディスコ] ${engine}による代打翻訳の結果を保存（選択中エンジンのキャッシュにはしません）`
+        );
+        setCache(buildCacheKey(engine), translatedText);
+      }
       sendResponse({ success: true, text: translatedText });
       consecutiveFailures = 0; // 成功したらリセット
     } catch (err) {

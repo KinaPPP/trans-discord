@@ -41,7 +41,7 @@
   "options_geminiKeyHelpLink": { "message": "Google AI Studio" },
   "options_geminiKeyHelpMiddle1": { "message": "で無料発行できます（クレジットカード不要）。" },
   "options_geminiKeyHelpBold": { "message": "Gemini Appの有料プラン（Gemini Pro等）とは別物" },
-  "options_geminiKeyHelpMiddle2": { "message": "で、ログイン情報は流用できないため、必ずここでAPIキーを発行・入力してください。ゲーム用語やスラングの解釈が機械翻訳より自然になりやすい一方、発言ごとに口調が揺れやすい・処理が少し遅いという特性があります。ダークファンタジー系の過激な単語（Flayedなど）で翻訳がブロックされないよう、セーフティフィルターは緩めに設定しています。失敗時は、DeepLキーが設定されていればDeepLに、それも無ければGoogle翻訳に自動的に切り替わります。" },
+  "options_geminiKeyHelpMiddle2": { "message": "で、ログイン情報は流用できないため、必ずここでAPIキーを発行・入力してください。ゲーム用語やスラングの解釈が機械翻訳より自然になりやすい一方、発言ごとに口調が揺れやすい・処理が少し遅いという特性があります。ダークファンタジー系の過激な単語（Flayedなど）で翻訳がブロックされないよう、セーフティフィルターは緩めに設定しています。無料枠は1分あたり15リクエストが上限のため、短時間に大量の発言を自動翻訳すると、その分は制限に達する前に自動的にDeepL/Google翻訳へ回されます。失敗時は、DeepLキーが設定されていればDeepLに、それも無ければGoogle翻訳に自動的に切り替わります。" },
 
   "options_geminiToneLabel": { "message": "Geminiの口調" },
   "options_geminiToneAuto": { "message": "おまかせ（発言のニュアンスに応じて自然に揺らぐ）" },

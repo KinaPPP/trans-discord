@@ -41,7 +41,7 @@
   "options_geminiKeyHelpLink": { "message": "Google AI Studio" },
   "options_geminiKeyHelpMiddle1": { "message": "." },
   "options_geminiKeyHelpBold": { "message": "This is separate from the paid Gemini App plans (Gemini Pro, etc.)" },
-  "options_geminiKeyHelpMiddle2": { "message": ", and login credentials aren't shared, so you must issue and enter an API key here. It tends to handle gaming terms and slang more naturally than machine translation, but tone can vary a bit between messages and it's a little slower. Safety filters are relaxed so dark-fantasy game vocabulary (e.g. \"Flayed\") doesn't get blocked. On failure it automatically falls back to DeepL (if configured), then Google Translate." },
+  "options_geminiKeyHelpMiddle2": { "message": ", and login credentials aren't shared, so you must issue and enter an API key here. It tends to handle gaming terms and slang more naturally than machine translation, but tone can vary a bit between messages and it's a little slower. Safety filters are relaxed so dark-fantasy game vocabulary (e.g. \"Flayed\") doesn't get blocked. The free tier is capped at 15 requests/minute, so if a lot of messages get auto-translated at once, the extra ones are automatically routed to DeepL/Google Translate before hitting that limit. On failure it automatically falls back to DeepL (if configured), then Google Translate." },
 
   "options_geminiToneLabel": { "message": "Gemini tone" },
   "options_geminiToneAuto": { "message": "Let it vary naturally with each message" },
