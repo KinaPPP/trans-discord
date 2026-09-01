@@ -170,6 +170,16 @@ function extractText(element) {
       "code, pre, .discord-translated-message, .discord-translated-title, [class*='hiddenVisually']"
     )
     .forEach((n) => n.remove());
+
+  // 箇条書き（li要素）はCSSの::markerで記号が表示されているだけで、実テキストには
+  // 含まれていない。そのままでは翻訳エンジンが「リストかどうか」を毎回推測することに
+  // なり結果が揺れるため、ここで明示的に先頭へ埋め込んでおく。
+  // ※「・」は日本語特有の記号なので、13言語対応に合わせて国際的に標準の
+  //   ビュレット記号「•」（ブラウザのデフォルトリスト表示と同じ）を使う。
+  clone.querySelectorAll("li").forEach((li) => {
+    li.prepend(document.createTextNode("• "));
+  });
+
   return clone.innerText ? clone.innerText.trim() : (clone.textContent || "").trim();
 }
 
