@@ -159,6 +159,54 @@ function isTranslationCandidate(text) {
 }
 
 // コードブロックや既存の翻訳ボックス自体を巻き込まないようにしてテキストを抽出
+// ブロック要素（div, p, ul, li, h1〜h6等）の境界とbr要素を、確実に改行として
+// テキスト化する。innerTextはDiscordの入れ子の深いDOM構造だと、要素の境界に
+// 改行を入れてくれないことがある（cloneNodeで切り離した要素は特に顕著）ため、
+// 自前でDOMを歩いて構築する。
+const BLOCK_TAGS = new Set([
+  "DIV", "P", "UL", "OL", "LI", "H1", "H2", "H3", "H4", "H5", "H6",
+]);
+
+function walkTextWithBreaks(node) {
+  let text = "";
+
+  function appendBreakIfNeeded() {
+    if (text.length > 0 && !text.endsWith("\n")) {
+      text += "\n";
+    }
+  }
+
+  function walk(n) {
+    if (n.nodeType === Node.TEXT_NODE) {
+      text += n.textContent;
+      return;
+    }
+    if (n.nodeType !== Node.ELEMENT_NODE) return;
+
+    if (n.tagName === "BR") {
+      text += "\n";
+      return;
+    }
+
+    const isBlock = BLOCK_TAGS.has(n.tagName);
+    if (isBlock) appendBreakIfNeeded();
+
+    // 箇条書き（li要素）はCSSの::markerで記号が表示されているだけで、実テキストには
+    // 含まれていない。そのままでは翻訳エンジンが「リストかどうか」を毎回推測することに
+    // なり結果が揺れるため、ここで明示的に先頭へ埋め込んでおく。
+    // ※「・」は日本語特有の記号なので、13言語対応に合わせて国際的に標準の
+    //   ビュレット記号「•」（ブラウザのデフォルトリスト表示と同じ）を使う。
+    if (n.tagName === "LI") text += "• ";
+
+    n.childNodes.forEach(walk);
+
+    if (isBlock) appendBreakIfNeeded();
+  }
+
+  walk(node);
+  return text;
+}
+
 function extractText(element) {
   const clone = element.cloneNode(true);
   clone
@@ -171,16 +219,9 @@ function extractText(element) {
     )
     .forEach((n) => n.remove());
 
-  // 箇条書き（li要素）はCSSの::markerで記号が表示されているだけで、実テキストには
-  // 含まれていない。そのままでは翻訳エンジンが「リストかどうか」を毎回推測することに
-  // なり結果が揺れるため、ここで明示的に先頭へ埋め込んでおく。
-  // ※「・」は日本語特有の記号なので、13言語対応に合わせて国際的に標準の
-  //   ビュレット記号「•」（ブラウザのデフォルトリスト表示と同じ）を使う。
-  clone.querySelectorAll("li").forEach((li) => {
-    li.prepend(document.createTextNode("• "));
-  });
-
-  return clone.innerText ? clone.innerText.trim() : (clone.textContent || "").trim();
+  const text = walkTextWithBreaks(clone);
+  // 連続する空行は2つ（段落の区切り分）までに詰める
+  return text.replace(/\n{3,}/g, "\n\n").trim();
 }
 
 // 画面内に入った要素は「青いエリア（未翻訳）」を表示するだけにとどめる
