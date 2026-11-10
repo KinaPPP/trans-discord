@@ -183,8 +183,10 @@ function detectScript(text) {
   const kana = count(/[\u3040-\u30FF]/g);
   const han = count(/[\u4E00-\u9FFF]/g);
   const scores = {
-    // かなが1つでもあれば漢字も日本語として数える（中国語にかなは無い）
-    ja: kana > 0 ? kana + han : 0,
+    // かなが1つでもあれば漢字も日本語として数える（中国語にかなは無い）。
+    // 日本語は1文字あたりの情報量が多く、「STREET FIGHTER 6やりたい」のように英単語が
+    // 混ざると文字数で負けやすいため、ラテン文字の4文字分として数える
+    ja: kana > 0 ? (kana + han) * 4 : 0,
     han: kana > 0 ? 0 : han, // かなの無い漢字だけの文。日本語か中国語かは決められない
     ko: count(/[\uAC00-\uD7A3\u1100-\u11FF\u3130-\u318F]/g),
     ru: count(/[\u0400-\u04FF]/g),
@@ -201,6 +203,9 @@ function detectScript(text) {
 // 文字の種類と、Chromeの推測（確実ではない場合も含む）を組み合わせて判定する。
 // guess は Chrome が一番可能性が高いとした言語コード（無ければ null）
 function isTargetByScript(text, target, guess) {
+  // かなは日本語にしか無いので、かながあってChromeも日本語と推測したなら日本語とみなす
+  if (guess === "ja" && /[\u3040-\u30FF]/.test(text)) return target === "ja";
+
   const script = detectScript(text);
 
   if (script === "han") {
@@ -473,6 +478,16 @@ function showEngineLabel(container, engine) {
   container.appendChild(label);
 }
 
+// 訳文が原文と実質的に同じか（ゲーム名だけの発言などは訳しても変わらない）。
+// 全角・半角、大文字・小文字、空白、句読点や記号の違いは無視して比べる
+function normalizeForCompare(text) {
+  return text.normalize("NFKC").toLowerCase().replace(/[\s\p{P}\p{S}]/gu, "");
+}
+
+function isSameText(a, b) {
+  return normalizeForCompare(a) === normalizeForCompare(b);
+}
+
 function runTranslation(container) {
   if (container.dataset.state === "loading" || container.dataset.state === "done") return;
   const rawText = container.dataset.rawText;
@@ -493,7 +508,7 @@ function runTranslation(container) {
       console.log("[トランス☆ディスコ] 翻訳結果:", response);
       if (response && response.success && response.text) {
         const translated = response.text.trim();
-        if (translated.toLowerCase() === rawText.toLowerCase()) {
+        if (isSameText(translated, rawText)) {
           container.remove();
         } else {
           container.textContent = translated;
