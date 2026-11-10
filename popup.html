@@ -111,6 +111,38 @@
   button:active {
     background: #2d6abf;
   }
+  /* 押せない状態（ローカル翻訳を使っていないとき・確認中） */
+  button:disabled {
+    background: #d0d0d0;
+    color: #888;
+    box-shadow: none;
+    cursor: default;
+  }
+
+  /* ローカル翻訳の状態表示 */
+  .localStatus {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    margin-bottom: 8px;
+  }
+  .statusDot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex: none;
+    background: #d0d0d0;
+  }
+  .localStatusLabel {
+    font-weight: 600;
+  }
+  /* 状態によって説明の長さが変わっても、ポップアップの高さが変わらないよう1行に固定する */
+  #localStatusHelp {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
 </style>
 </head>
 <body>
@@ -135,13 +167,18 @@
   </label>
 
   <div class="card">
-    <button id="openOptionsButton" type="button" data-i18n="popup_openOptionsLabel">詳細設定を開く</button>
-    <p class="help" data-i18n="popup_openOptionsHelpShort">翻訳エンジン、言語、表示ルールを設定します。</p>
+    <div class="localStatus">
+      <span id="localStatusDot" class="statusDot"></span>
+      <span class="localStatusLabel" data-i18n="popup_localStatusLabel">ローカル翻訳：</span>
+      <span id="localStatusText"></span>
+    </div>
+    <button id="localCheckButton" type="button" data-i18n="popup_localCheckButton">接続を確認</button>
+    <p id="localStatusHelp" class="help">&nbsp;</p>
   </div>
 
   <div class="card">
-    <button id="captchaButton" type="button" data-i18n="popup_captchaButtonLabel">Google翻訳が出ない場合はこちら</button>
-    <p class="help" data-i18n="popup_captchaHelpShort">「ロボットではありません」認証の確認ページを新しいタブで開きます。</p>
+    <button id="openOptionsButton" type="button" data-i18n="popup_openOptionsLabel">詳細設定を開く</button>
+    <p class="help" data-i18n="popup_openOptionsHelpShort">翻訳エンジン、言語、表示ルールを設定します。</p>
   </div>
 
   <div class="card">

@@ -4,7 +4,6 @@
 
   "popup_extensionEnabledLabel": { "message": "Enable extension" },
   "popup_autoTranslateLabel": { "message": "Enable auto-translate" },
-  "popup_captchaButtonLabel": { "message": "Google Translate not working?" },
   "popup_openOptionsLabel": { "message": "Open advanced settings" },
   "popup_clearCacheButtonLabel": { "message": "Clear cached translations" },
   "popup_clearCacheDone": { "message": "Cleared." },
@@ -56,7 +55,7 @@
   "options_languageHelp": { "message": "Fixing the source language means translate buttons only appear on messages in that language (e.g. fixing it to Japanese means English messages in the same thread won't get a button). Japanese, Chinese, Korean, Russian, and Thai are detected by script; other languages (EN/FR/DE/ES/PT/IT/VI/ID) use a simple Latin-script heuristic. Setting the target to \"Auto (browser language)\" translates according to your browser's display language. This language setting also applies to Gemini." },
 
   "options_displayRulesHeading": { "message": "Display Rules" },
-  "options_skipNativeLabel": { "message": "Don't show for mostly-Japanese messages" },
+  "options_skipNativeLabel": { "message": "Don't show for messages already in the target language" },
   "options_skipShortLabel": { "message": "Don't show for very short messages" },
 
   "lang_auto": { "message": "Auto-detect" },
@@ -103,6 +102,20 @@
   "popup_extensionEnabledHelpShort": { "message": "When off, nothing runs, including the blue bars" },
   "popup_autoTranslateHelpShort": { "message": "Auto-translation starts from your first click" },
   "popup_openOptionsHelpShort": { "message": "Set the engine, languages, and display rules." },
-  "popup_captchaHelpShort": { "message": "Opens the \"I'm not a robot\" check page in a new tab." },
-  "popup_clearCacheHelpShort": { "message": "Clears saved translations (cache)." }
+  "popup_clearCacheHelpShort": { "message": "Clears saved translations (cache)." },
+
+  "popup_localStatusLabel": { "message": "Local translation:" },
+  "popup_localCheckButton": { "message": "Check connection" },
+  "popup_localUnused": { "message": "Not in use" },
+  "popup_localChecking": { "message": "Checking…" },
+  "popup_localOk": { "message": "Connected" },
+  "popup_localStopped": { "message": "Server stopped" },
+  "popup_localNoModel": { "message": "Model not loaded" },
+  "popup_localError": { "message": "Connection error" },
+  "popup_localUnusedHelp": { "message": "Choose it as the engine in advanced settings." },
+  "popup_localAutoHelp": { "message": "Checked each time you open this." },
+  "popup_localFallbackHelp": { "message": "Another engine is translating for now." },
+  "options_troubleHeading": { "message": "Troubleshooting" },
+  "options_captchaButtonLabel": { "message": "Google Translate not working?" },
+  "options_captchaHelp": { "message": "Google Translate may be asking for an \"I'm not a robot\" check. The button opens the check page in a new tab (this doesn't affect DeepL, Gemini, or local translation errors)." }
 }

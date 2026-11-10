@@ -4,7 +4,6 @@
 
   "popup_extensionEnabledLabel": { "message": "拡張機能を有効にする" },
   "popup_autoTranslateLabel": { "message": "自動翻訳を有効にする" },
-  "popup_captchaButtonLabel": { "message": "Google翻訳が出ない場合はこちら" },
   "popup_openOptionsLabel": { "message": "詳細設定を開く" },
   "popup_clearCacheButtonLabel": { "message": "古い翻訳の削除" },
   "popup_clearCacheDone": { "message": "削除しました。" },
@@ -56,7 +55,7 @@
   "options_languageHelp": { "message": "翻訳元を特定の言語に固定すると、その言語の発言だけに翻訳ボタンが表示されるようになります（例：翻訳元を日本語にすると、同じスレッド内の英語の発言にはボタンが出ません）。日本語・中国語・韓国語・ロシア語・タイ語はそれぞれの文字体系で判定し、それ以外（英・仏・独・西・葡・伊・越・尼）はラテン文字の有無による簡易判定です。翻訳先を「自動（ブラウザの言語設定）」にすると、お使いのブラウザの表示言語に合わせて翻訳されます。この言語設定はGeminiにもそのまま反映されます。" },
 
   "options_displayRulesHeading": { "message": "表示ルール" },
-  "options_skipNativeLabel": { "message": "日本語主体の発言には表示しない" },
+  "options_skipNativeLabel": { "message": "翻訳先の言語の発言には表示しない" },
   "options_skipShortLabel": { "message": "極端に短い発言には表示しない" },
 
   "lang_auto": { "message": "自動検出" },
@@ -103,6 +102,20 @@
   "popup_extensionEnabledHelpShort": { "message": "OFFにすると一切動作しません" },
   "popup_autoTranslateHelpShort": { "message": "1クリック目から自動で翻訳します" },
   "popup_openOptionsHelpShort": { "message": "翻訳エンジン、言語、表示ルールを設定します。" },
-  "popup_captchaHelpShort": { "message": "「ロボットではありません」認証の確認ページを新しいタブで開きます。" },
-  "popup_clearCacheHelpShort": { "message": "翻訳の一時保存（キャッシュ）を消去します。" }
+  "popup_clearCacheHelpShort": { "message": "翻訳の一時保存（キャッシュ）を消去します。" },
+
+  "popup_localStatusLabel": { "message": "ローカル翻訳：" },
+  "popup_localCheckButton": { "message": "接続を確認" },
+  "popup_localUnused": { "message": "使用していません" },
+  "popup_localChecking": { "message": "確認中…" },
+  "popup_localOk": { "message": "接続OK" },
+  "popup_localStopped": { "message": "サーバー停止中" },
+  "popup_localNoModel": { "message": "モデル未読み込み" },
+  "popup_localError": { "message": "接続エラー" },
+  "popup_localUnusedHelp": { "message": "詳細設定の翻訳エンジンで選べます。" },
+  "popup_localAutoHelp": { "message": "開くたびに自動で確認します。" },
+  "popup_localFallbackHelp": { "message": "いまは他のエンジンで翻訳しています。" },
+  "options_troubleHeading": { "message": "困ったときは" },
+  "options_captchaButtonLabel": { "message": "Google翻訳が出ない場合はこちら" },
+  "options_captchaHelp": { "message": "Google翻訳から「ロボットではありません」認証を求められている可能性があります。ボタンを押すと確認用ページが新しいタブで開きます（DeepL・Gemini・ローカル翻訳のエラーには関係ありません）。" }
 }

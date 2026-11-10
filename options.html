@@ -207,12 +207,18 @@
   <div class="section">
     <label>
       <input type="checkbox" id="skipNativeLanguageToggle" />
-      <span data-i18n="options_skipNativeLabel">日本語主体の発言には表示しない</span>
+      <span data-i18n="options_skipNativeLabel">翻訳先の言語の発言には表示しない</span>
     </label>
     <label>
       <input type="checkbox" id="skipShortMessagesToggle" />
       <span data-i18n="options_skipShortLabel">極端に短い発言には表示しない</span>
     </label>
+  </div>
+
+  <h2 data-i18n="options_troubleHeading">困ったときは</h2>
+  <div class="section">
+    <button id="captchaButton" type="button" data-i18n="options_captchaButtonLabel">Google翻訳が出ない場合はこちら</button>
+    <p class="help" data-i18n="options_captchaHelp">Google翻訳から「ロボットではありません」認証を求められている可能性があります。ボタンを押すと確認用ページが新しいタブで開きます（DeepL・Gemini・ローカル翻訳のエラーには関係ありません）。</p>
   </div>
 
   <script src="i18n.js"></script>

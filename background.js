@@ -71,7 +71,7 @@ const SETTINGS_DEFAULTS = {
   plamoForm: "auto", // "auto" | "polite" | "plain"（日本語訳のときだけ有効）
   plamoModel: "", // 接続テストまたは初回翻訳時に、サーバーから自動検出して保存する
   sourceLang: "auto", // "auto" または言語コード（例: "en"）
-  targetLang: "ja", // "browser"（ブラウザの言語設定）または言語コード
+  targetLang: "browser", // "browser"（ブラウザの言語設定）または言語コード
 };
 
 // Manifest V3のService Workerは操作が無いと終了し、次のメッセージで再起動する。

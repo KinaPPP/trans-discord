@@ -15,7 +15,7 @@ const DEFAULT_SETTINGS = {
   plamoServerUrl: "http://localhost:1234",
   plamoForm: "auto",
   sourceLang: "auto",
-  targetLang: "ja",
+  targetLang: "browser",
   skipNativeLanguage: true,
   skipShortMessages: true,
 };
@@ -234,6 +234,13 @@ plamoTestButton.addEventListener("click", () => {
       }
     }
   );
+});
+
+// --- 困ったときは：Google翻訳のCAPTCHA確認ページを開く ---
+document.getElementById("captchaButton").addEventListener("click", () => {
+  chrome.tabs.create({
+    url: "https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=ja&dt=t&q=hello",
+  });
 });
 
 document.getElementById("versionLabel").textContent =

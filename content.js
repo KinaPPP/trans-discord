@@ -4,6 +4,7 @@ let autoTranslate = true;
 let skipNativeLanguage = true;
 let skipShortMessages = true;
 let sourceLang = "auto";
+let targetLang = "browser";
 // 自動翻訳ONでも、実際に一斉翻訳を「発動」させるのは最初のクリックがあってから
 let autoArmed = false;
 // クリック待ち（未翻訳）のまま残っているコンテナ。発動時にまとめて翻訳するために保持
@@ -22,6 +23,7 @@ const DEFAULT_SETTINGS = {
   skipNativeLanguage: true,
   skipShortMessages: true,
   sourceLang: "auto",
+  targetLang: "browser",
 };
 
 chrome.storage.local.get(DEFAULT_SETTINGS, (result) => {
@@ -30,6 +32,7 @@ chrome.storage.local.get(DEFAULT_SETTINGS, (result) => {
   skipNativeLanguage = result.skipNativeLanguage;
   skipShortMessages = result.skipShortMessages;
   sourceLang = result.sourceLang;
+  targetLang = result.targetLang;
 });
 
 chrome.storage.onChanged.addListener((changes, area) => {
@@ -63,6 +66,9 @@ chrome.storage.onChanged.addListener((changes, area) => {
   }
   if (changes.sourceLang) {
     sourceLang = changes.sourceLang.newValue;
+  }
+  if (changes.targetLang) {
+    targetLang = changes.targetLang.newValue;
   }
 });
 
@@ -110,7 +116,7 @@ function isSecretChannel() {
   return false;
 }
 
-// 日本語主体の発言には翻訳ボタンを出さないため、極端に短い発言（英字が少ない）にも出さないため
+// 極端に短い発言に翻訳ボタンを出さないためのしきい値
 const SHORT_TEXT_THRESHOLD = 6;
 
 function isTranslationCandidate(text) {
@@ -142,8 +148,10 @@ function isTranslationCandidate(text) {
     // タイ語：タイ文字の有無で判定
     if (thaiChars < 2) return false;
   } else if (sourceLang === "auto") {
-    if (latinLetters < 2) return false;
-    if (skipNativeLanguage && japaneseChars > latinLetters) return false;
+    // 自動検出：文字の種類を問わず、文字が2つ以上あれば候補にする。
+    // 「翻訳先と同じ言語かどうか」の判定は、非同期の isInTargetLanguage で行う
+    const letters = (text.match(/\p{L}/gu) || []).length;
+    if (letters < 2) return false;
   } else {
     // それ以外（英・仏・独・西・葡・伊・越・尼など）：厳密な言語判定はできないため、
     // ラテン文字主体かどうかの簡易判定で近似する
@@ -156,6 +164,88 @@ function isTranslationCandidate(text) {
   }
 
   return true;
+}
+
+// ===== 翻訳先と同じ言語の発言かどうかの判定（翻訳元が「自動検出」のとき） =====
+
+// 翻訳先の言語コード（「自動」はブラウザの表示言語）。例: "ja-JP" → "ja"
+function resolveTargetLangCode() {
+  const code = targetLang === "browser" ? chrome.i18n.getUILanguage() || "ja" : targetLang;
+  return code.split("-")[0].toLowerCase();
+}
+
+// ラテン文字を使う言語（文字の種類だけでは互いに区別できない）
+const LATIN_SCRIPT_LANGS = new Set(["en", "fr", "de", "es", "pt", "it", "vi", "id"]);
+
+// 文字の種類から、いちばん多く使われている文字体系を推定する
+function detectScript(text) {
+  const count = (re) => (text.match(re) || []).length;
+  const kana = count(/[\u3040-\u30FF]/g);
+  const han = count(/[\u4E00-\u9FFF]/g);
+  const scores = {
+    // かなが1つでもあれば漢字も日本語として数える（中国語にかなは無い）
+    ja: kana > 0 ? kana + han : 0,
+    han: kana > 0 ? 0 : han, // かなの無い漢字だけの文。日本語か中国語かは決められない
+    ko: count(/[\uAC00-\uD7A3\u1100-\u11FF\u3130-\u318F]/g),
+    ru: count(/[\u0400-\u04FF]/g),
+    th: count(/[\u0E00-\u0E7F]/g),
+    latin: count(/[a-zA-Z\u00C0-\u024F]/g),
+  };
+  const letters = count(/\p{L}/gu);
+  const [best, bestScore] = Object.entries(scores).sort((a, b) => b[1] - a[1])[0];
+  // 上のどれにも当てはまらない文字（アラビア文字など）が主体なら「その他」
+  if (bestScore === 0 || bestScore * 2 < letters) return "other";
+  return best;
+}
+
+// 文字の種類と、Chromeの推測（確実ではない場合も含む）を組み合わせて判定する。
+// guess は Chrome が一番可能性が高いとした言語コード（無ければ null）
+function isTargetByScript(text, target, guess) {
+  const script = detectScript(text);
+
+  if (script === "han") {
+    // かなの無い漢字だけの文。長めの文でChromeが中国語と推測したら中国語として扱う。
+    // 「了解」「草」のような短い文は日本語とも中国語とも決められないので、どちらも同じ言語扱い
+    const han = (text.match(/[\u4E00-\u9FFF]/g) || []).length;
+    if (guess === "zh" && han >= 5) return target === "zh";
+    if (guess === "ja") return target === "ja";
+    return target === "ja" || target === "zh";
+  }
+
+  if (script === "latin") {
+    // 翻訳先がラテン文字以外の言語なら、ラテン文字の発言は別の言語
+    if (!LATIN_SCRIPT_LANGS.has(target)) return false;
+    // 翻訳先もラテン文字の言語：ある程度長い文で、Chromeの推測が既知のラテン文字の言語なら採用する
+    const letters = (text.match(/\p{L}/gu) || []).length;
+    if (letters >= 15 && guess && LATIN_SCRIPT_LANGS.has(guess)) return guess === target;
+    // 短い発言（gg、lol 等）は区別できないので、青バーだらけにならないよう同じ言語扱い
+    return true;
+  }
+
+  return script === target;
+}
+
+// Chromeに内蔵の言語判定（通信なし）と文字の種類を組み合わせて判定する
+function isInTargetLanguage(text, callback) {
+  const target = resolveTargetLangCode();
+  try {
+    chrome.i18n.detectLanguage(text, (result) => {
+      if (chrome.runtime.lastError || !result) {
+        callback(isTargetByScript(text, target, null));
+        return;
+      }
+      const top = result.languages?.[0]?.language;
+      const guess = top ? top.split("-")[0].toLowerCase() : null;
+      // Chromeが「確実」と判定したときは、それをそのまま使う
+      if (result.isReliable && guess) {
+        callback(guess === target);
+        return;
+      }
+      callback(isTargetByScript(text, target, guess));
+    });
+  } catch {
+    callback(isTargetByScript(text, target, null));
+  }
 }
 
 // コードブロックや既存の翻訳ボックス自体を巻き込まないようにしてテキストを抽出
@@ -239,9 +329,23 @@ const visibilityObserver = new IntersectionObserver(
 );
 
 function prepareTranslation(element) {
-  const isTitle = element.dataset.translateType === "title";
   const rawText = extractText(element);
   if (!rawText || !isTranslationCandidate(rawText)) return;
+
+  // 翻訳元が「自動検出」で、翻訳先と同じ言語の発言には青バーを出さない設定のとき
+  if (sourceLang === "auto" && skipNativeLanguage) {
+    isInTargetLanguage(rawText, (sameLanguage) => {
+      if (!sameLanguage) addTranslationBox(element, rawText);
+    });
+    return;
+  }
+  addTranslationBox(element, rawText);
+}
+
+function addTranslationBox(element, rawText) {
+  const isTitle = element.dataset.translateType === "title";
+  // 判定を待つ間に拡張機能がOFFにされたり、DM等に移動した場合は何もしない
+  if (!extensionEnabled || isSecretChannel()) return;
 
   // タイトルは、添付ファイル側などに複製された同一テキストを二重表示しないよう
   // 全ページ内で最初の1件だけを対象にする
