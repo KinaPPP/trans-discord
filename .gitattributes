@@ -8,3 +8,6 @@
 *.jpeg binary
 *.gif binary
 *.ico binary
+
+# Windowsのバッチファイルは、LFだと正しく動かないことがあるためCRLFに固定する
+*.bat text eol=crlf

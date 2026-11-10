@@ -61,11 +61,15 @@ let isRunning = false;
 let consecutiveFailures = 0;
 
 const SETTINGS_DEFAULTS = {
-  translationProvider: "google", // "google" | "deepl" | "gemini"
+  translationProvider: "google", // "google" | "deepl" | "gemini" | "plamo"
   deeplApiKey: "",
   geminiApiKey: "",
   geminiTone: "auto", // "auto" | "frank" | "polite" | "cat" | "ojousama" | "kansai" | "custom"
   geminiCustomPrompt: "",
+  plamoServerType: "lmstudio", // "lmstudio" | "llamacpp" | "ollama"
+  plamoServerUrl: "http://localhost:1234",
+  plamoForm: "auto", // "auto" | "polite" | "plain"（日本語訳のときだけ有効）
+  plamoModel: "", // 接続テストまたは初回翻訳時に、サーバーから自動検出して保存する
   sourceLang: "auto", // "auto" または言語コード（例: "en"）
   targetLang: "ja", // "browser"（ブラウザの言語設定）または言語コード
 };
@@ -324,6 +328,188 @@ async function translateWithGemini(text, settings) {
   throw new Error(`GEMINI_EMPTY_RESPONSE${finishReason ? `_${finishReason}` : ""}`);
 }
 
+// ===== ローカル翻訳（PLaMo 3 Translate） =====
+// 利用者が自分のPCで起動した LM Studio / llama.cpp / Ollama に送る。
+// モデルは同梱せず、翻訳はPC内で完結する（Built with PLaMo）。
+
+// PLaMo 3 Translate の対応言語コード（公式モデルカード記載の53言語）
+const PLAMO_LANGS = new Set([
+  "ja", "en", "zh-hans", "zh-hant", "ko", "ar", "az", "be", "bg", "bn", "ca", "ceb",
+  "de", "es", "et", "eu", "fa", "fr", "gu", "he", "hi", "hr", "hu", "hy", "id", "it",
+  "jv", "ka", "kk", "km", "lt", "lv", "ml", "mr", "ms", "my", "ne", "nl", "pa", "pl",
+  "ru", "si", "sk", "sl", "sr", "sw", "ta", "te", "th", "tl", "ur", "uz", "vi",
+]);
+
+// トランス☆ディスコの言語コード → PLaMoの言語コード。対応外なら null
+function toPlamoLang(code) {
+  if (code === "zh") return "zh-hans";
+  return PLAMO_LANGS.has(code) ? code : null;
+}
+
+// サーバーの種類ごとの既定URL
+const PLAMO_DEFAULT_URLS = {
+  lmstudio: "http://localhost:1234",
+  llamacpp: "http://localhost:8000",
+  ollama: "http://localhost:11434",
+};
+
+const PLAMO_STOP = ["<|plamo:tag|>", "<|plamo:bos|>"];
+const PLAMO_TIMEOUT_MS = 60_000; // 初回はモデル読み込みで時間がかかることがあるため長め
+
+// 拡張機能の権限（host_permissions）で許可しているのは自分のPCだけ
+function normalizePlamoUrl(rawUrl) {
+  let url;
+  try {
+    url = new URL((rawUrl || "").trim());
+  } catch {
+    throw new Error("PLAMO_BAD_URL");
+  }
+  if (url.protocol !== "http:" || !["localhost", "127.0.0.1"].includes(url.hostname)) {
+    throw new Error("PLAMO_BAD_URL");
+  }
+  return url.origin;
+}
+
+async function fetchWithTimeout(url, options = {}, timeoutMs = PLAMO_TIMEOUT_MS) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } catch (err) {
+    if (err.name === "AbortError") throw new Error("PLAMO_TIMEOUT");
+    // サーバー未起動・ポート違いなど
+    throw new Error("PLAMO_UNREACHABLE");
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// サーバーに読み込まれているモデル一覧から、PLaMo翻訳モデルを探す
+async function detectPlamoModel(serverType, origin) {
+  const isOllama = serverType === "ollama";
+  const res = await fetchWithTimeout(
+    isOllama ? `${origin}/api/tags` : `${origin}/v1/models`,
+    {},
+    10_000
+  );
+  if (res.status === 403) throw new Error("PLAMO_FORBIDDEN");
+  if (!res.ok) throw new Error(`PLAMO_HTTP_${res.status}`);
+  const data = await res.json();
+  const names = isOllama
+    ? (data.models || []).map((m) => m.name || m.model)
+    : (data.data || []).map((m) => m.id);
+  const found =
+    names.find((n) => /plamo.*translate/i.test(n || "")) ||
+    names.find((n) => /plamo/i.test(n || ""));
+  if (!found) {
+    // llama-server は1モデルしか載せないので、名前に plamo が無くてもそれを使う
+    if (serverType === "llamacpp" && names.length > 0) return names[0];
+    throw new Error("PLAMO_MODEL_NOT_FOUND");
+  }
+  return found;
+}
+
+// PFML3形式のプロンプトを組み立てる（公式モデルカードの書式どおり。BOSはサーバー側が付与）
+function buildPlamoPrompt(text, sourceLang, targetLang, form) {
+  // 原文に制御用の記号列が紛れていても書式が壊れないよう無害化する
+  const safeText = text.replace(/<\|plamo:/g, "<​|plamo:");
+  let prompt = "<|plamo:tag|>dataset<|plamo:msg|>translation";
+  prompt += "<|plamo:tag|>input";
+  if (sourceLang) prompt += `<|plamo:key|>lang<|plamo:val|>${sourceLang}`;
+  prompt += `<|plamo:msg|>${safeText}`;
+  prompt += `<|plamo:tag|>output<|plamo:key|>lang<|plamo:val|>${targetLang}`;
+  if (form) prompt += `<|plamo:key|>form<|plamo:val|>${form}`;
+  prompt += "<|plamo:msg|>";
+  return prompt;
+}
+
+async function translateWithPlamo(text, settings) {
+  const serverType = PLAMO_DEFAULT_URLS[settings.plamoServerType]
+    ? settings.plamoServerType
+    : "lmstudio";
+  const origin = normalizePlamoUrl(settings.plamoServerUrl);
+
+  const targetLang = toPlamoLang(resolveTargetLang(settings.targetLang));
+  if (!targetLang) throw new Error("PLAMO_UNSUPPORTED_LANG");
+  // 翻訳元が自動、またはPLaMo非対応の言語なら指定せずモデルに判定させる
+  const sourceLang =
+    settings.sourceLang === "auto" ? null : toPlamoLang(settings.sourceLang);
+  const form =
+    targetLang === "ja" && ["polite", "plain"].includes(settings.plamoForm)
+      ? settings.plamoForm
+      : null;
+
+  let model = settings.plamoModel;
+  if (!model) {
+    model = await detectPlamoModel(serverType, origin);
+    chrome.storage.local.set({ plamoModel: model });
+  }
+
+  const prompt = buildPlamoPrompt(text, sourceLang, targetLang, form);
+  console.log("[トランス☆ディスコ] PLaMoへ送信します。", { serverType, origin, model, prompt });
+
+  // チャット用テンプレートを通さず、PFML3の文字列をそのまま渡す必要がある。
+  // Ollamaは /v1/completions にもテンプレートを当てるため /api/generate + raw を使う
+  const maxTokens = 2048;
+  const res =
+    serverType === "ollama"
+      ? await fetchWithTimeout(`${origin}/api/generate`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            model,
+            prompt,
+            raw: true,
+            stream: false,
+            options: { temperature: 0, num_predict: maxTokens, stop: PLAMO_STOP },
+          }),
+        })
+      : await fetchWithTimeout(`${origin}/v1/completions`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            model,
+            prompt,
+            temperature: 0,
+            max_tokens: maxTokens,
+            stop: PLAMO_STOP,
+            stream: false,
+          }),
+        });
+
+  if (res.status === 403) throw new Error("PLAMO_FORBIDDEN");
+  if (res.status === 404 || res.status === 400) {
+    // モデルを入れ替えた等で保存済みの名前が古い可能性がある。次回は検出し直す
+    chrome.storage.local.set({ plamoModel: "" });
+    throw new Error(`PLAMO_HTTP_${res.status}`);
+  }
+  if (!res.ok) {
+    console.error("[トランス☆ディスコ] PLaMo HTTPエラー:", res.status, await res.text());
+    throw new Error(`PLAMO_HTTP_${res.status}`);
+  }
+
+  const data = await res.json();
+  let output = serverType === "ollama" ? data.response : data.choices?.[0]?.text;
+  if (typeof output !== "string") throw new Error("PLAMO_UNEXPECTED_FORMAT");
+  // 停止トークンが出力に残るサーバーがあっても、そこで切る
+  for (const stop of PLAMO_STOP) {
+    const idx = output.indexOf(stop);
+    if (idx !== -1) output = output.slice(0, idx);
+  }
+  output = output.trim();
+  if (!output) throw new Error("PLAMO_EMPTY_RESPONSE");
+  return output;
+}
+
+// 詳細設定の「接続テスト」用：サーバーに届くか、PLaMoモデルがあるかを確認する
+async function testPlamoConnection(serverType, rawUrl) {
+  const type = PLAMO_DEFAULT_URLS[serverType] ? serverType : "lmstudio";
+  const origin = normalizePlamoUrl(rawUrl);
+  const model = await detectPlamoModel(type, origin);
+  await chrome.storage.local.set({ plamoModel: model });
+  return model;
+}
+
 async function translateText(text, settings) {
   console.log("[トランス☆ディスコ] 使用する翻訳エンジン:", settings.translationProvider);
 
@@ -354,6 +540,13 @@ async function translateText(text, settings) {
         }
         return translateWithGemini(text, settings);
       },
+    },
+    plamo: {
+      id: "plamo",
+      name: "PLaMo",
+      // ローカル翻訳は、選択中のときだけ使う（サーバー未起動のPCで毎回待たされないように）
+      available: settings.translationProvider === "plamo",
+      fn: () => translateWithPlamo(text, settings),
     },
   };
 
@@ -391,7 +584,7 @@ async function processQueue() {
     //   「選択中エンジンの結果」として固定してしまわないよう、書き込み時は
     //   実際に翻訳したエンジンのキーを使う（下記参照）。
     const buildCacheKey = (engineId) =>
-      `${engineId}:${settings.sourceLang}:${settings.targetLang}:${settings.geminiTone}:${settings.geminiCustomPrompt}:${text}`;
+      `${engineId}:${settings.sourceLang}:${settings.targetLang}:${settings.geminiTone}:${settings.plamoForm}:${settings.geminiCustomPrompt}:${text}`;
     const primaryCacheKey = buildCacheKey(settings.translationProvider);
 
     console.log(
@@ -404,7 +597,7 @@ async function processQueue() {
     const cachedValue = getCache(primaryCacheKey);
     if (cachedValue !== undefined) {
       console.log("[トランス☆ディスコ] キャッシュから返答（新規リクエストは送っていません）");
-      sendResponse({ success: true, text: cachedValue });
+      sendResponse({ success: true, text: cachedValue, engine: settings.translationProvider });
       continue;
     }
 
@@ -421,7 +614,7 @@ async function processQueue() {
         );
         setCache(buildCacheKey(engine), translatedText);
       }
-      sendResponse({ success: true, text: translatedText });
+      sendResponse({ success: true, text: translatedText, engine });
       consecutiveFailures = 0; // 成功したらリセット
     } catch (err) {
       consecutiveFailures++;
@@ -439,6 +632,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === "translate") {
     queue.push({ text: request.text, sendResponse });
     processQueue();
+    return true;
+  }
+  if (request.action === "plamoTest") {
+    testPlamoConnection(request.serverType, request.serverUrl)
+      .then((model) => sendResponse({ success: true, model }))
+      .catch((err) => sendResponse({ success: false, error: err.message }));
     return true;
   }
   if (request.action === "clearCache") {

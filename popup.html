@@ -6,14 +6,15 @@
   body {
     font-family: "メイリオ", "Meiryo", "Yu Gothic", sans-serif;
     width: 300px;
-    padding: 14px;
+    padding: 12px;
     margin: 0;
     background: #e8e8e8;
     color: #1a1a1a;
+    box-sizing: border-box;
   }
   h1 {
     font-size: 13px;
-    margin: 0 0 10px;
+    margin: 0 0 2px;
     color: #1a1a1a;
   }
   .versionLabel {
@@ -22,85 +23,131 @@
     color: #888;
     margin-left: 4px;
   }
-  label {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 13px;
-    color: #1a1a1a;
+  /* 項目ごとのカード（背景より少し明るい灰色） */
+  .card {
+    background: #f7f7f7;
+    border: 1px solid #d0d0d0;
+    border-radius: 10px;
+    padding: 10px 12px;
+    margin-top: 8px;
   }
-  p {
+  .help {
     font-size: 11px;
     color: #888;
-    margin: 8px 0 0;
+    margin: 5px 0 0;
     line-height: 1.5;
   }
-  hr {
-    border: none;
-    border-top: 1px solid #d0d0d0;
-    margin: 12px 0;
+
+  /* スイッチ（チェックボックスを見た目だけスイッチにする） */
+  .toggleCard {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
   }
-  button,
-  .linkButton {
+  .toggleCard input {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+  }
+  .switch {
+    position: relative;
+    flex: none;
+    width: 36px;
+    height: 20px;
+    border-radius: 10px;
+    background: #bdbdbd;
+    transition: background 0.15s ease;
+  }
+  .switch::after {
+    content: "";
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+    transition: left 0.15s ease;
+  }
+  .toggleCard input:checked + .switch {
+    background: #4a8ce0;
+  }
+  .toggleCard input:checked + .switch::after {
+    left: 18px;
+  }
+  .toggleCard input:focus-visible + .switch {
+    outline: 2px solid #3a7bd5;
+    outline-offset: 2px;
+  }
+  .toggleTitle {
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .toggleCard .help {
+    margin-top: 1px;
+  }
+
+  button {
     display: block;
     width: 100%;
     padding: 8px 0;
     font-size: 12px;
     font-weight: 600;
+    font-family: inherit;
     border: none;
     border-radius: 6px;
     background: #4a8ce0;
     color: #fff;
     cursor: pointer;
     text-align: center;
-    text-decoration: none;
-    box-sizing: border-box;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
   }
-  button:hover,
-  .linkButton:hover {
+  button:hover {
     background: #3a7bd5;
   }
-  button:active,
-  .linkButton:active {
+  button:active {
     background: #2d6abf;
-  }
-  label + label {
-    margin-top: 8px;
   }
 </style>
 </head>
 <body>
   <h1>トランス☆ディスコ <span id="versionLabel" class="versionLabel"></span></h1>
 
-  <label>
+  <label class="card toggleCard">
     <input type="checkbox" id="extensionEnabledToggle" />
-    <span data-i18n="popup_extensionEnabledLabel">拡張機能を有効にする</span>
+    <span class="switch"></span>
+    <span>
+      <span class="toggleTitle" data-i18n="popup_extensionEnabledLabel">拡張機能を有効にする</span>
+      <span class="help" style="display:block;" data-i18n="popup_extensionEnabledHelpShort">OFFにすると一切動作しません</span>
+    </span>
   </label>
-  <p data-i18n="popup_extensionEnabledHelp">OFFにすると、青いエリアの表示も含めて一切動作しなくなります。</p>
 
-  <hr />
-
-  <label>
+  <label class="card toggleCard">
     <input type="checkbox" id="autoTranslateToggle" />
-    <span data-i18n="popup_autoTranslateLabel">自動翻訳を有効にする</span>
+    <span class="switch"></span>
+    <span>
+      <span class="toggleTitle" data-i18n="popup_autoTranslateLabel">自動翻訳を有効にする</span>
+      <span class="help" style="display:block;" data-i18n="popup_autoTranslateHelpShort">1クリック目から自動で翻訳します</span>
+    </span>
   </label>
-  <p data-i18n="popup_autoTranslateHelp">ONの場合も、開いた直後は「クリックして翻訳」が並ぶだけです。どれか1つをクリックすると、そこから自動翻訳が始まります。OFFならクリックした発言だけ翻訳されます。</p>
 
-  <hr />
+  <div class="card">
+    <button id="openOptionsButton" type="button" data-i18n="popup_openOptionsLabel">詳細設定を開く</button>
+    <p class="help" data-i18n="popup_openOptionsHelpShort">翻訳エンジン、言語、表示ルールを設定します。</p>
+  </div>
 
-  <button id="captchaButton" type="button" data-i18n="popup_captchaButtonLabel">Google翻訳が出ない場合はこちら</button>
-  <p data-i18n="popup_captchaHelp">Google翻訳から「ロボットではありません」認証を求められている可能性があります。ボタンを押すと確認用ページが新しいタブで開きます（DeepL/Geminiのエラーには関係ありません）。</p>
+  <div class="card">
+    <button id="captchaButton" type="button" data-i18n="popup_captchaButtonLabel">Google翻訳が出ない場合はこちら</button>
+    <p class="help" data-i18n="popup_captchaHelpShort">「ロボットではありません」認証の確認ページを新しいタブで開きます。</p>
+  </div>
 
-  <hr />
-
-  <a href="#" id="openOptionsLink" class="linkButton" data-i18n="popup_openOptionsLabel">詳細設定を開く</a>
-  <p data-i18n="popup_openOptionsHelp">翻訳エンジン、翻訳する言語、表示ルールなどはこちらから設定できます。</p>
-
-  <hr />
-
-  <button id="clearCacheButton" type="button" data-i18n="popup_clearCacheButtonLabel">古い翻訳の削除</button>
-  <p id="clearCacheHelp" data-i18n="popup_clearCacheHelp">これまでに翻訳した内容の一時保存（キャッシュ）を消去します。次に同じ発言を開いた際は再度翻訳が行われます。</p>
+  <div class="card">
+    <button id="clearCacheButton" type="button" data-i18n="popup_clearCacheButtonLabel">古い翻訳の削除</button>
+    <p id="clearCacheHelp" class="help" data-i18n="popup_clearCacheHelpShort">翻訳の一時保存（キャッシュ）を消去します。</p>
+  </div>
 
   <script src="i18n.js"></script>
   <script src="popup.js"></script>

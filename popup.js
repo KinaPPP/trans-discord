@@ -26,8 +26,7 @@ document.getElementById("captchaButton").addEventListener("click", () => {
   });
 });
 
-document.getElementById("openOptionsLink").addEventListener("click", (e) => {
-  e.preventDefault();
+document.getElementById("openOptionsButton").addEventListener("click", () => {
   chrome.runtime.openOptionsPage();
 });
 
@@ -36,7 +35,6 @@ document.getElementById("versionLabel").textContent =
 
 const clearCacheButton = document.getElementById("clearCacheButton");
 const clearCacheHelp = document.getElementById("clearCacheHelp");
-const clearCacheHelpDefault = clearCacheHelp.textContent;
 
 clearCacheButton.addEventListener("click", () => {
   clearCacheButton.disabled = true;
@@ -44,7 +42,8 @@ clearCacheButton.addEventListener("click", () => {
     if (response && response.success) {
       clearCacheHelp.textContent = chrome.i18n.getMessage("popup_clearCacheDone");
       setTimeout(() => {
-        clearCacheHelp.textContent = clearCacheHelpDefault;
+        // i18n.js の置き換えより先にこのスクリプトが読まれるため、元の文言は都度取得する
+        clearCacheHelp.textContent = chrome.i18n.getMessage("popup_clearCacheHelpShort");
         clearCacheButton.disabled = false;
       }, 2000);
     } else {

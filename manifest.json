@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "__MSG_extName__",
-  "version": "1.13.8",
+  "version": "1.14.0",
   "description": "__MSG_extDescription__",
   "default_locale": "ja",
   "permissions": ["storage"],
@@ -10,7 +10,9 @@
     "https://translate.googleapis.com/*",
     "https://api-free.deepl.com/*",
     "https://api.deepl.com/*",
-    "https://generativelanguage.googleapis.com/*"
+    "https://generativelanguage.googleapis.com/*",
+    "http://localhost/*",
+    "http://127.0.0.1/*"
   ],
   "icons": {
     "16": "icons/icon16.png",

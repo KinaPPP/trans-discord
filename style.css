@@ -46,3 +46,15 @@
   opacity: 1;
   background-color: rgba(88, 101, 242, 0.28);
 }
+
+/* 実際に翻訳したエンジン名。訳文の邪魔にならないよう、右下に小さく薄く */
+.discord-translated-engine {
+  font-size: 0.75em;
+  font-weight: normal;
+  line-height: 1.2;
+  text-align: right;
+  margin-top: 2px;
+  opacity: 0.55;
+  white-space: nowrap;
+  user-select: none;
+}

@@ -57,6 +57,7 @@
     align-items: center;
   }
   select,
+  input[type="text"],
   input[type="password"] {
     width: 100%;
     box-sizing: border-box;
@@ -110,6 +111,7 @@
       <option value="google" data-i18n="options_providerGoogle">Google翻訳</option>
       <option value="deepl" data-i18n="options_providerDeepl">DeepL（要APIキー）</option>
       <option value="gemini" data-i18n="options_providerGemini">Gemini（要APIキー・ゲーム用語/スラングに強い）</option>
+      <option value="plamo" data-i18n="options_providerPlamo">ローカル（PLaMo 3 Translate・自分のPCで翻訳）</option>
     </select>
 
     <span class="fieldLabel" data-i18n="options_deeplKeyLabel">DeepL APIキー</span>
@@ -151,6 +153,38 @@
         placeholder="例：語尾を「〜なのだ」で統一してください"></textarea>
       <p class="help" data-i18n="options_geminiCustomPromptHelp">内容自体は正確に翻訳させつつ、口調だけを変える指示を書くのがおすすめです（例：「内容は正確に、語尾だけ〜なのだ、にしてください」）。過激な内容への変更依頼などは無視される場合があります。</p>
     </div>
+
+    <hr style="margin:16px 0; border:none; border-top:1px solid #d0d0d0;" />
+
+    <span class="fieldLabel" style="font-weight:600;" data-i18n="options_plamoHeading">ローカル翻訳（PLaMo）</span>
+
+    <span class="fieldLabel" data-i18n="options_plamoServerTypeLabel">サーバーの種類</span>
+    <select id="plamoServerTypeSelect">
+      <option value="lmstudio">LM Studio</option>
+      <option value="llamacpp">llama.cpp（llama-server）</option>
+      <option value="ollama">Ollama</option>
+    </select>
+
+    <span class="fieldLabel" data-i18n="options_plamoServerUrlLabel">サーバーURL</span>
+    <div class="row">
+      <input type="text" id="plamoServerUrlInput" placeholder="http://localhost:1234" spellcheck="false" />
+      <button id="plamoTestButton" type="button" style="white-space:nowrap; width:auto;" data-i18n="options_plamoTestButton">接続テスト</button>
+    </div>
+    <div id="plamoTestResult" style="margin-top:6px; font-size:12px; min-height:16px;"></div>
+
+    <span class="fieldLabel" data-i18n="options_plamoFormLabel">日本語訳の文体</span>
+    <select id="plamoFormSelect">
+      <option value="auto" data-i18n="options_plamoFormAuto">おまかせ</option>
+      <option value="polite" data-i18n="options_plamoFormPolite">です・ます調</option>
+      <option value="plain" data-i18n="options_plamoFormPlain">だ・である調</option>
+    </select>
+
+    <p class="help">
+      <span data-i18n="options_plamoHelp">PLaMo 3 Translate を自分のPCで起動しておく必要があります（2BのQ4_K_M版がおすすめ）。翻訳はPC内で完結し、外部には送信されません。接続先は自分のPC（localhost）に限ります。翻訳できなかったときは、APIキーのあるDeepL・Gemini、最後にGoogle翻訳へ自動的に切り替わります。ポルトガル語は非対応のため、他のエンジンで翻訳されます。</span>
+      <br />
+      <a href="https://huggingface.co/pfnet/plamo-3-translate-2b-GGUF" target="_blank" rel="noopener" data-i18n="options_plamoModelLink">モデルの入手（Hugging Face）</a>
+      ／ Built with PLaMo（<a href="https://plamo.preferredai.jp/info/plamo-community-license-ja" target="_blank" rel="noopener" data-i18n="options_plamoLicenseLink">PLaMoコミュニティライセンス</a>）
+    </p>
   </div>
 
   <h2 data-i18n="options_languageHeading">翻訳する言語</h2>

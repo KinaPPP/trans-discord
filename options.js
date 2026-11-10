@@ -11,6 +11,9 @@ const DEFAULT_SETTINGS = {
   geminiApiKey: "",
   geminiTone: "auto",
   geminiCustomPrompt: "",
+  plamoServerType: "lmstudio",
+  plamoServerUrl: "http://localhost:1234",
+  plamoForm: "auto",
   sourceLang: "auto",
   targetLang: "ja",
   skipNativeLanguage: true,
@@ -151,6 +154,86 @@ deeplUsageRefreshButton.addEventListener("click", refreshDeeplUsage);
 // ページを開いたとき、既にキーが設定済みなら自動で一度取得する
 chrome.storage.local.get(DEFAULT_SETTINGS, (result) => {
   if (result.deeplApiKey) refreshDeeplUsage();
+});
+
+// --- ローカル翻訳（PLaMo） ---
+const PLAMO_DEFAULT_URLS = {
+  lmstudio: "http://localhost:1234",
+  llamacpp: "http://localhost:8000",
+  ollama: "http://localhost:11434",
+};
+const plamoServerTypeSelect = document.getElementById("plamoServerTypeSelect");
+const plamoServerUrlInput = document.getElementById("plamoServerUrlInput");
+const plamoFormSelect = document.getElementById("plamoFormSelect");
+const plamoTestButton = document.getElementById("plamoTestButton");
+const plamoTestResult = document.getElementById("plamoTestResult");
+
+function showPlamoResult(message, ok) {
+  plamoTestResult.textContent = message;
+  plamoTestResult.style.color = ok === true ? "#28a745" : ok === false ? "#dc2626" : "#555";
+}
+
+chrome.storage.local.get(DEFAULT_SETTINGS, (result) => {
+  plamoServerTypeSelect.value = result.plamoServerType;
+  plamoServerUrlInput.value = result.plamoServerUrl;
+  plamoFormSelect.value = result.plamoForm;
+});
+
+plamoServerTypeSelect.addEventListener("change", () => {
+  const type = plamoServerTypeSelect.value;
+  // 種類を変えたら、URLもその種類の既定値に合わせる。検出済みのモデル名は使えないので消す
+  plamoServerUrlInput.value = PLAMO_DEFAULT_URLS[type];
+  chrome.storage.local.set({
+    plamoServerType: type,
+    plamoServerUrl: PLAMO_DEFAULT_URLS[type],
+    plamoModel: "",
+  });
+  showPlamoResult("", null);
+});
+
+plamoServerUrlInput.addEventListener("change", () => {
+  const url = plamoServerUrlInput.value.trim().replace(/\/+$/, "");
+  plamoServerUrlInput.value = url;
+  chrome.storage.local.set({ plamoServerUrl: url, plamoModel: "" });
+  showPlamoResult("", null);
+});
+
+plamoFormSelect.addEventListener("change", () => {
+  chrome.storage.local.set({ plamoForm: plamoFormSelect.value });
+});
+
+function plamoErrorMessage(code) {
+  const map = {
+    PLAMO_BAD_URL: "options_plamoErrBadUrl",
+    PLAMO_UNREACHABLE: "options_plamoErrUnreachable",
+    PLAMO_TIMEOUT: "options_plamoErrUnreachable",
+    PLAMO_MODEL_NOT_FOUND: "options_plamoErrNoModel",
+    PLAMO_FORBIDDEN:
+      plamoServerTypeSelect.value === "ollama"
+        ? "options_plamoErrOllamaOrigin"
+        : "options_plamoErrForbidden",
+  };
+  return chrome.i18n.getMessage(map[code] || "options_plamoErrOther", [code || ""]);
+}
+
+plamoTestButton.addEventListener("click", () => {
+  showPlamoResult(chrome.i18n.getMessage("options_plamoTesting"), null);
+  plamoTestButton.disabled = true;
+  chrome.runtime.sendMessage(
+    {
+      action: "plamoTest",
+      serverType: plamoServerTypeSelect.value,
+      serverUrl: plamoServerUrlInput.value.trim(),
+    },
+    (response) => {
+      plamoTestButton.disabled = false;
+      if (response && response.success) {
+        showPlamoResult(chrome.i18n.getMessage("options_plamoTestOk", [response.model]), true);
+      } else {
+        showPlamoResult(plamoErrorMessage(response && response.error), false);
+      }
+    }
+  );
 });
 
 document.getElementById("versionLabel").textContent =

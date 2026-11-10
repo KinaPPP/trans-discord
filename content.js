@@ -354,6 +354,21 @@ function handleMessageEdited(element, isTitle) {
   registerElement(element, isTitle ? "title" : "message");
 }
 
+// 実際に翻訳したエンジン名を薄く添える（フォールバックで別エンジンが訳した場合も分かるように）。
+// フォーラムタイトルは文字を足すと折り返しやすく、狭いと訳文が隠れる仕様に触れるため、
+// 本文には右下にラベル、タイトルにはマウスを乗せたときのヒントとして出す。
+function showEngineLabel(container, engine) {
+  if (!engine) return;
+  const name = chrome.i18n.getMessage(`engine_${engine}`) || engine;
+  // 翻訳前の「クリックで翻訳」のヒントが残らないよう、どちらもエンジン名に置き換える
+  container.title = name;
+  if (container.classList.contains("discord-translated-title")) return;
+  const label = document.createElement("div");
+  label.className = "discord-translated-engine";
+  label.textContent = name;
+  container.appendChild(label);
+}
+
 function runTranslation(container) {
   if (container.dataset.state === "loading" || container.dataset.state === "done") return;
   const rawText = container.dataset.rawText;
@@ -379,6 +394,7 @@ function runTranslation(container) {
         } else {
           container.textContent = translated;
           container.dataset.state = "done";
+          showEngineLabel(container, response.engine);
           const sourceElement = containerSourceElement.get(container);
           if (sourceElement) {
             watchForEdits(
