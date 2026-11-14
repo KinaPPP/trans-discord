@@ -66,10 +66,11 @@ const SETTINGS_DEFAULTS = {
   geminiApiKey: "",
   geminiTone: "auto", // "auto" | "frank" | "polite" | "cat" | "ojousama" | "kansai" | "custom"
   geminiCustomPrompt: "",
-  plamoServerType: "lmstudio", // "lmstudio" | "llamacpp" | "ollama"
+  plamoServerType: "lmstudio", // "sts"（シンプル翻訳サーバー） | "lmstudio" | "llamacpp" | "ollama"
   plamoServerUrl: "http://localhost:1234",
   plamoForm: "auto", // "auto" | "polite" | "plain"（日本語訳のときだけ有効）
   plamoModel: "", // 接続テストまたは初回翻訳時に、サーバーから自動検出して保存する
+  plamoApiKey: "", // シンプル翻訳サーバーの合言葉（接続アプリごとに発行されたもの）
   sourceLang: "auto", // "auto" または言語コード（例: "en"）
   targetLang: "browser", // "browser"（ブラウザの言語設定）または言語コード
 };
@@ -99,6 +100,56 @@ function resolveTargetLang(targetLang) {
     return uiLang.split("-")[0];
   }
   return targetLang;
+}
+
+// ===== パスワードやトークンらしき文字列の検査 =====
+// 外部の翻訳サービス（Google・DeepL・Gemini）に送る前に、拡張機能自身でも調べる。
+// シンプル翻訳サーバーが止まっていても、怪しい発言が外部に出ないようにするため。
+// ※ すべてを見抜くことはできない補助的な守り。シンプル翻訳サーバーの secrets.js と同じ規則。
+const SECRET_PHRASE_PATTERNS = [
+  /(?:password|passwd|passcode|パスワード|パスコード|暗証番号)\s*[:=：]\s*(?!(?:reset|here|please|is|it|the|a|an|and|or|not|forgot|change|update)\b)\S/i,
+  /\b(?:pass|pw|pwd)\s*[:=：]\s*(?=\S*[A-Za-z])(?=\S*[0-9!@#$%^&*])\S{4,}/i,
+  /(?:パスワード|暗証番号)\s*(?:は|わ)\s*[「『"']?[\x21-\x7E]{4,}/,
+  /\bpass(?:word|code)?\s+is\s+["'`]?(?=[\x21-\x7E]*[0-9!@#$%^&*])[\x21-\x7E]{4,}/i,
+];
+const SECRET_TOKEN_PATTERNS = [
+  /\bsk-(?:proj-)?[A-Za-z0-9_-]{20,}/,
+  /\bsk-ant-[A-Za-z0-9_-]{20,}/,
+  /\b(?:ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]{30,}/,
+  /\bgithub_pat_[A-Za-z0-9_]{30,}/,
+  /\bxox[abprs]-[A-Za-z0-9-]{10,}/,
+  /\bAKIA[0-9A-Z]{16}\b/,
+  /\bAIza[0-9A-Za-z_-]{35}\b/,
+  /\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/,
+  /\b[MN][A-Za-z\d_-]{23,25}\.[A-Za-z\d_-]{6}\.[A-Za-z\d_-]{27,}/,
+  /-----BEGIN [A-Z ]*PRIVATE KEY-----/,
+  /\b(?:sk|rk|pk)_(?:live|test)_[A-Za-z0-9]{16,}/,
+  /\bhf_[A-Za-z0-9]{30,}/,
+  /\bglpat-[A-Za-z0-9_-]{20,}/,
+  /\b[0-9a-f]{40,}\b/i,
+];
+
+function hasRandomToken(text) {
+  const candidates = text.match(/[A-Za-z0-9+/_=-]{32,}/g) || [];
+  return candidates.some((s) => {
+    const lower = (s.match(/[a-z]/g) || []).length;
+    const upper = (s.match(/[A-Z]/g) || []).length;
+    const digit = (s.match(/[0-9]/g) || []).length;
+    return lower >= 4 && upper >= 4 && digit >= 4;
+  });
+}
+
+function looksSecret(text) {
+  if (typeof text !== "string" || !text) return false;
+  const normalized = text.normalize("NFKC");
+  const urls = normalized.match(/https?:\/\/\S+/g) || [];
+  if (urls.some((u) => SECRET_TOKEN_PATTERNS.some((re) => re.test(u)))) return true;
+  const withoutUrls = normalized.replace(/https?:\/\/\S+/g, " ");
+  return (
+    SECRET_PHRASE_PATTERNS.some((re) => re.test(withoutUrls)) ||
+    SECRET_TOKEN_PATTERNS.some((re) => re.test(withoutUrls)) ||
+    hasRandomToken(withoutUrls)
+  );
 }
 
 async function translateWithGoogle(text, settings) {
@@ -277,7 +328,7 @@ function recordGeminiRequest() {
 }
 
 async function translateWithGemini(text, settings) {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${settings.geminiApiKey}`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
   const systemPrompt = buildGeminiSystemPrompt(settings);
 
   recordGeminiRequest();
@@ -288,11 +339,10 @@ async function translateWithGemini(text, settings) {
     "/ 実際のシステムプロンプト:",
     systemPrompt
   );
-  console.log("[トランス☆ディスコ] 送信する原文テキスト（改行確認用）:\n" + text);
-
   const res = await fetch(url, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    // APIキーはURLに入れず、ヘッダーで送る（URLはログなどに残りやすいため）
+    headers: { "Content-Type": "application/json", "x-goog-api-key": settings.geminiApiKey },
     body: JSON.stringify({
       contents: [{ parts: [{ text }] }],
       systemInstruction: { parts: [{ text: systemPrompt }] },
@@ -348,6 +398,7 @@ function toPlamoLang(code) {
 
 // サーバーの種類ごとの既定URL
 const PLAMO_DEFAULT_URLS = {
+  sts: "http://localhost:5055",
   lmstudio: "http://localhost:1234",
   llamacpp: "http://localhost:8000",
   ollama: "http://localhost:11434",
@@ -374,7 +425,8 @@ async function fetchWithTimeout(url, options = {}, timeoutMs = PLAMO_TIMEOUT_MS)
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    return await fetch(url, { ...options, signal: controller.signal });
+    // 別の場所への転送（リダイレクト）には従わない（自分のPCの外へ送られないように）
+    return await fetch(url, { ...options, signal: controller.signal, redirect: "error" });
   } catch (err) {
     if (err.name === "AbortError") throw new Error("PLAMO_TIMEOUT");
     // サーバー未起動・ポート違いなど
@@ -439,6 +491,8 @@ async function translateWithPlamo(text, settings) {
       ? settings.plamoForm
       : null;
 
+  if (serverType === "sts") return translateWithSts(origin, text, sourceLang, targetLang, form, settings.plamoApiKey);
+
   let model = settings.plamoModel;
   if (!model) {
     model = await detectPlamoModel(serverType, origin);
@@ -446,7 +500,7 @@ async function translateWithPlamo(text, settings) {
   }
 
   const prompt = buildPlamoPrompt(text, sourceLang, targetLang, form);
-  console.log("[トランス☆ディスコ] PLaMoへ送信します。", { serverType, origin, model, prompt });
+  console.log("[トランス☆ディスコ] PLaMoへ送信します。", { serverType, origin, model });
 
   // チャット用テンプレートを通さず、PFML3の文字列をそのまま渡す必要がある。
   // Ollamaは /v1/completions にもテンプレートを当てるため /api/generate + raw を使う
@@ -501,13 +555,43 @@ async function translateWithPlamo(text, settings) {
   return output;
 }
 
-// 詳細設定の「接続テスト」用：サーバーに届くか、PLaMoモデルがあるかを確認する
-async function testPlamoConnection(serverType, rawUrl) {
+// シンプル翻訳サーバー（LibreTranslate互換の窓口）で翻訳する。
+// PLaMo専用の書式の組み立てや辞書はサーバー側が受け持つ
+async function translateWithSts(origin, text, sourceLang, targetLang, form, apiKey) {
+  if (!apiKey) throw new Error("PLAMO_NO_KEY");
+  const res = await fetchWithTimeout(`${origin}/translate`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+    body: JSON.stringify({ q: text, source: sourceLang || "auto", target: targetLang, ...(form ? { form } : {}) }),
+  });
+  // パスワード等らしき文字列があるとして断られた発言は、他のエンジンにも回さない
+  if (res.status === 422) throw new Error("PLAMO_REFUSED");
+  if (res.status === 403) throw new Error("PLAMO_BAD_KEY");
+  if (res.status === 503) throw new Error("PLAMO_PAUSED_OR_UNAVAILABLE");
+  if (!res.ok) throw new Error(`PLAMO_HTTP_${res.status}`);
+  const data = await res.json();
+  const output = typeof data.translatedText === "string" ? data.translatedText.trim() : "";
+  if (!output) throw new Error("PLAMO_EMPTY_RESPONSE");
+  return output;
+}
+
+// 詳細設定の「接続テスト」とポップアップの状態表示用：
+// サーバーに届くか、PLaMoモデル（シンプル翻訳サーバーなら合言葉）が使えるかを確認する
+async function testPlamoConnection(serverType, rawUrl, apiKey) {
   const type = PLAMO_DEFAULT_URLS[serverType] ? serverType : "lmstudio";
   const origin = normalizePlamoUrl(rawUrl);
+  if (type === "sts") {
+    // 翻訳エンジンを起動させずに、合言葉だけを確かめる
+    if (!apiKey) throw new Error("PLAMO_NO_KEY");
+    const res = await fetchWithTimeout(`${origin}/whoami`, { headers: { Authorization: `Bearer ${apiKey}` } }, 10_000);
+    if (res.status === 403) throw new Error("PLAMO_BAD_KEY");
+    if (!res.ok) throw new Error(`PLAMO_HTTP_${res.status}`);
+    const data = await res.json();
+    return { model: data.name, paused: !!data.paused };
+  }
   const model = await detectPlamoModel(type, origin);
   await chrome.storage.local.set({ plamoModel: model });
-  return model;
+  return { model, paused: false };
 }
 
 async function translateText(text, settings) {
@@ -555,7 +639,14 @@ async function translateText(text, settings) {
   const order = [settings.translationProvider, "deepl", "gemini", "google"].filter(
     (id, index, arr) => arr.indexOf(id) === index
   );
-  const chain = order.map((id) => providers[id]).filter((p) => p && p.available);
+  let chain = order.map((id) => providers[id]).filter((p) => p && p.available);
+
+  // パスワードやトークンらしき文字列を含む発言は、自分のPCの中で訳せるローカル翻訳（PLaMo）だけに回す。
+  // ローカル翻訳が使えないときは、どこにも送らずに終える
+  if (looksSecret(text)) {
+    chain = chain.filter((p) => p.id === "plamo");
+    if (chain.length === 0) throw new Error("PLAMO_REFUSED");
+  }
 
   let lastError;
   for (const { id, name, fn } of chain) {
@@ -563,6 +654,10 @@ async function translateText(text, settings) {
       const translatedText = await fn();
       return { engine: id, text: translatedText };
     } catch (err) {
+      // 秘密情報らしいとして断られた発言は、外部のエンジンに回さずに終える
+      if (err.message === "PLAMO_REFUSED") throw err;
+      // 怪しい発言をローカル翻訳だけに回している場合も、失敗したらそこで終える
+      if (looksSecret(text)) throw new Error("PLAMO_REFUSED");
       lastError = err;
       console.log(`[トランス☆ディスコ] ${name}失敗、次のエンジンを試します:`, err.message);
     }
@@ -617,7 +712,7 @@ async function processQueue() {
       sendResponse({ success: true, text: translatedText, engine });
       consecutiveFailures = 0; // 成功したらリセット
     } catch (err) {
-      consecutiveFailures++;
+      if (err.message !== "PLAMO_REFUSED") consecutiveFailures++;
       sendResponse({ success: false, error: err.message });
     }
 
@@ -628,15 +723,41 @@ async function processQueue() {
   isRunning = false;
 }
 
+const MAX_TEXT_LENGTH = 4000; // Discordの1発言の上限（Nitro）
+
+// 送り元が、この拡張機能自身の画面（ポップアップ・詳細設定）かどうか
+function isExtensionPage(sender) {
+  return sender.id === chrome.runtime.id && typeof sender.url === "string" && sender.url.startsWith(chrome.runtime.getURL(""));
+}
+
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  if (sender.id !== chrome.runtime.id || !request || typeof request !== "object") return;
+
   if (request.action === "translate") {
+    if (typeof request.text !== "string" || !request.text.trim() || request.text.length > MAX_TEXT_LENGTH) {
+      sendResponse({ success: false, error: "INVALID_TEXT" });
+      return;
+    }
     queue.push({ text: request.text, sendResponse });
     processQueue();
     return true;
   }
+  // 接続テストとキャッシュの削除は、ポップアップと詳細設定からだけ受け付ける
+  if ((request.action === "plamoTest" || request.action === "clearCache") && !isExtensionPage(sender)) {
+    sendResponse({ success: false, error: "FORBIDDEN" });
+    return;
+  }
   if (request.action === "plamoTest") {
-    testPlamoConnection(request.serverType, request.serverUrl)
-      .then((model) => sendResponse({ success: true, model }))
+    // 合言葉は、詳細設定の入力欄の値（保存前）か、保存済みの値を使う。
+    // 保存済みの合言葉を使うときは、送り先も保存済みのURLに限る
+    chrome.storage.local
+      .get({ plamoApiKey: "", plamoServerUrl: "" })
+      .then(({ plamoApiKey, plamoServerUrl }) => {
+        const useSaved = typeof request.apiKey !== "string";
+        if (useSaved && request.serverUrl !== plamoServerUrl) throw new Error("PLAMO_BAD_URL");
+        return testPlamoConnection(request.serverType, request.serverUrl, useSaved ? plamoApiKey : request.apiKey);
+      })
+      .then(({ model, paused }) => sendResponse({ success: true, model, paused }))
       .catch((err) => sendResponse({ success: false, error: err.message }));
     return true;
   }

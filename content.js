@@ -98,22 +98,111 @@ function isSecretChannel() {
   // 1. DM・グループDM（URLが /channels/@me で始まる）
   if (location.pathname.startsWith("/channels/@me")) return true;
 
-  const lockSelectors =
-    'svg[aria-label*="プライベート"], svg[aria-label*="Private"], svg[aria-label*="ロック"], svg[aria-label*="Lock"]';
+  // 2. チャンネル一覧の、いま開いているチャンネルの項目。
+  //    Discordは項目の読み上げ用の名前に「〇〇(テキストチャンネル), プライベートチャンネル（ロック中）」のように
+  //    書き、アイコンには「テキスト(限定) icon」のような名前を付けている
+  const currentLink = document.querySelector(`a[href="${location.pathname}"]`);
+  const items = [
+    currentLink,
+    document.querySelector('[data-list-item-id^="channels___"][aria-selected="true"]'),
+    document.querySelector('[data-list-item-id^="channels___"][class*="selected"]'),
+  ].filter(Boolean);
+  for (const item of items) {
+    if (isLockedItem(item)) return true;
+    const row = item.closest("[data-list-item-id]");
+    if (row && row !== item && isLockedItem(row)) return true;
+  }
 
-  // 2. 画面上部ヘッダーの鍵アイコン（プライベートチャンネル表示）
-  const header = document.querySelector(
-    'section[aria-label*="チャンネル"], section[class*="title_"], header[class*="header_"]'
-  );
-  if (header && header.querySelector(lockSelectors)) return true;
-
-  // 3. チャンネル一覧側で現在選択中のアイテムに鍵アイコンが付いているか
-  const selectedChannel = document.querySelector(
-    '[data-list-item-id^="channels___"][aria-selected="true"], [class*="selected_"][data-list-item-id^="channels___"]'
-  );
-  if (selectedChannel && selectedChannel.querySelector(lockSelectors)) return true;
+  // 3. スレッド（フォーラムの投稿を含む）を開いているとき。
+  //    スレッドはチャンネル一覧に普通のリンクとして載らないので、親のチャンネルを調べる
+  if (!currentLink) {
+    const parents = findThreadParents();
+    // 親が分からないスレッドは、鍵付きの中のものかもしれないので、念のため翻訳しない
+    if (parents.length === 0) return true;
+    if (parents.some(isLockedItem)) return true;
+  }
 
   return false;
+}
+
+// 開いているスレッドの親チャンネル（一覧のリンク）を探す
+function findThreadParents() {
+  const segs = location.pathname.split("/").filter(Boolean); // ["channels", サーバー, ID, ("threads", スレッドID)]
+  const parents = [];
+  const linkFor = (id) => id && /^\d+$/.test(id) && document.querySelector(`a[href$="/${id}"][data-list-item-id^="channels___"], a[href$="/${id}"]`);
+
+  // a. URLが /channels/サーバー/親/threads/スレッド の形なら、親のIDが入っている
+  const ti = segs.indexOf("threads");
+  if (ti > 0) parents.push(linkFor(segs[ti - 1]));
+
+  // b. チャンネル一覧では、スレッドの行は親チャンネルのすぐ後ろに並ぶ。前にたどって最初のリンクが親
+  const threadId = segs[segs.length - 1];
+  const rows = [...document.querySelectorAll('[data-list-item-id^="channels___"]')];
+  const idx = rows.findIndex((r) => r.getAttribute("data-list-item-id") === `channels___${threadId}`);
+  for (let i = idx - 1; idx > 0 && i >= 0; i--) {
+    if (rows[i].tagName === "A") {
+      parents.push(rows[i]);
+      break;
+    }
+  }
+
+  // c. フォーラムの投稿一覧（data-list-id="forum-channel-list-<フォーラムのID>"）が表示されていれば、そのフォーラム
+  document.querySelectorAll('[data-list-id^="forum-channel-list-"]').forEach((list) => {
+    parents.push(linkFor(list.getAttribute("data-list-id").slice("forum-channel-list-".length)));
+  });
+
+  return parents.filter(Boolean);
+}
+
+// 鍵付き・限定公開を表す語（Discordの表示言語で変わるため、主な言語ぶん用意する）
+const LOCK_LABEL_PATTERN = new RegExp(
+  [
+    "プライベート", "ロック", "限定", "private", "lock", "limited", // 日本語・英語
+    "비공개", "잠금", "제한", // 韓国語
+    "私人", "私密", "私有", "專屬", "专属", "锁", "鎖", "受限", "限制", // 中国語
+    "privé", "verrouill", "limité", // フランス語
+    "privat", "gesperrt", "eingeschränkt", // ドイツ語・北欧語
+    "privad", "bloquead", "limitad", // スペイン語・ポルトガル語
+    "privato", "bloccat", "limitat", // イタリア語
+    "приват", "закрыт", "ограничен", // ロシア語
+    "prywatn", "zablokowan", "ograniczon", // ポーランド語
+    "özel", "kilitli", "sınırlı", // トルコ語
+    "ส่วนตัว", "ล็อก", "จำกัด", // タイ語
+    "riêng tư", "khóa", "giới hạn", // ベトナム語
+    "pribadi", "terkunci", "terbatas", // インドネシア語
+    "besloten", "beperkt", // オランダ語
+  ].join("|"),
+  "i"
+);
+
+// チャンネル一覧の項目が鍵付きかどうか。
+// 項目自身の名前は先頭にチャンネル名が入るので、チャンネル名の部分（最初の区切りまで）は除いて調べる
+// （「lockdown-攻略」のような公開チャンネル名で誤判定しないように）。
+// 中のアイコンの名前（「テキスト(限定) icon」など）はチャンネル名を含まないので、そのまま調べる
+function isLockedItem(el) {
+  const own = el.getAttribute("aria-label") || "";
+  const afterName = own.split(/[,，、]/).slice(1).join(",");
+  if (LOCK_LABEL_PATTERN.test(afterName)) return true;
+  return [...el.querySelectorAll("[aria-label]")].some((child) => {
+    const label = child.getAttribute("aria-label") || "";
+    // アイコン以外のボタン（「チャンネルに招待」など）は対象外
+    if (!/icon|アイコン/i.test(label)) return false;
+    // 普通のチャンネルは「テキスト icon」「Text icon」、鍵付きは「テキスト(限定) icon」「Text (Limited) icon」のように、
+    // どの言語でも「かっこ書き」が足される。言葉が分からない言語でも見分けられるよう、かっこ書きの有無で判定する
+    // （年齢制限など別の理由のかっこ書きでも、翻訳しない側に倒れるので安全）
+    return /[(（].+[)）]/.test(label) || LOCK_LABEL_PATTERN.test(label);
+  });
+}
+
+// 発言が、チャンネルのチャット欄（またはスレッドの欄）の中にあるか。
+// 検索結果・受信トレイ・ピン留め・ポップアップに出た発言は、別のチャンネル（鍵付きを含む）の
+// ものかもしれないので、読み取らない
+function isInChatList(el) {
+  if (!el.closest('[data-list-id^="chat-messages"]')) return false;
+  if (el.closest('[role="dialog"], [class*="searchResult"], [class*="recentMentions"], [class*="popout"], [class*="inbox"]')) {
+    return false;
+  }
+  return true;
 }
 
 // 極端に短い発言に翻訳ボタンを出さないためのしきい値
@@ -310,7 +399,7 @@ function extractText(element) {
       //   innerTextの「見た目上隠れているかどうか」の判定が効かない。
       //   そのためDiscordのスクリーンリーダー専用テキスト（hiddenVisually）は
       //   ここで明示的に取り除く。
-      "code, pre, .discord-translated-message, .discord-translated-title, [class*='hiddenVisually']"
+      "code, pre, .discord-translated-message, .discord-translated-title, [class*='hiddenVisually'], [class*='spoilerContent'], [class*='spoilerMarkdownContent'], [class*='spoilerText']"
     )
     .forEach((n) => n.remove());
 
@@ -493,10 +582,7 @@ function runTranslation(container) {
   const rawText = container.dataset.rawText;
   if (!rawText) return;
 
-  console.log(
-    `[トランス☆ディスコ] 翻訳リクエスト送信 (${container.classList.contains("discord-translated-title") ? "タイトル" : "本文"}):`,
-    rawText
-  );
+  console.log("[トランス☆ディスコ] 翻訳リクエスト送信（本文はログに出しません）");
 
   container.dataset.state = "loading";
   container.classList.remove("discord-translate-pending");
@@ -505,7 +591,7 @@ function runTranslation(container) {
   chrome.runtime.sendMessage(
     { action: "translate", text: rawText },
     (response) => {
-      console.log("[トランス☆ディスコ] 翻訳結果:", response);
+      console.log("[トランス☆ディスコ] 翻訳結果:", response && response.success ? `成功（${response.engine}）` : response && response.error);
       if (response && response.success && response.text) {
         const translated = response.text.trim();
         if (isSameText(translated, rawText)) {
@@ -522,6 +608,11 @@ function runTranslation(container) {
             );
           }
         }
+        pendingContainers.delete(container);
+      } else if (response && response.error === "PLAMO_REFUSED") {
+        // パスワード等らしき文字列があるとして断られた発言は、再試行もさせない
+        container.textContent = chrome.i18n.getMessage("content_refusedSecret");
+        container.dataset.state = "done";
         pendingContainers.delete(container);
       } else {
         // 失敗時はクリックで再試行できる状態に戻す（pendingContainersには残す）
@@ -583,7 +674,7 @@ function scanTargets() {
       'div[id^="message-content-"], [class*="messageContent-"]'
     )
     .forEach((el) => {
-      registerElement(el, "message");
+      if (isInChatList(el)) registerElement(el, "message");
     });
 
   // 2. フォーラム一覧のカードタイトル & スレッド見出し（既知パターン）

@@ -90,7 +90,7 @@
   "options_plamoFormAuto": { "message": "おまかせ" },
   "options_plamoFormPolite": { "message": "です・ます調" },
   "options_plamoFormPlain": { "message": "だ・である調" },
-  "options_plamoHelp": { "message": "PLaMo 3 Translate を自分のPCで起動しておく必要があります（2BのQ4_K_M版がおすすめ）。翻訳はPC内で完結し、外部には送信されません。接続先は自分のPC（localhost）に限ります。翻訳できなかったときは、APIキーのあるDeepL・Gemini、最後にGoogle翻訳へ自動的に切り替わります。ポルトガル語は非対応のため、他のエンジンで翻訳されます。" },
+  "options_plamoHelp": { "message": "シンプル翻訳サーバー、またはLM Studio等で PLaMo 3 Translate を自分のPCで起動しておく必要があります（モデルは2BのQ4_K_M版がおすすめ）。ローカル翻訳で訳せた発言は、自分のPCの外には送られません。ただし、サーバーが止まっている・一時停止中・合言葉が違うなどで訳せなかったときは、APIキーのあるDeepL・Gemini、最後にGoogle翻訳へ自動的に切り替わり、その発言は外部に送られます。パスワードやトークンらしき文字列を含む発言は、どの場合も外部のサービスには送りません（代表的な形だけを見分ける補助的な守りです）。接続先は自分のPC（localhost）に限ります。ポルトガル語は非対応のため、他のエンジンで翻訳されます。" },
   "options_plamoModelLink": { "message": "モデルの入手（Hugging Face）" },
   "options_plamoLicenseLink": { "message": "PLaMoコミュニティライセンス" },
 
@@ -117,5 +117,15 @@
   "popup_localFallbackHelp": { "message": "いまは他のエンジンで翻訳しています。" },
   "options_troubleHeading": { "message": "困ったときは" },
   "options_captchaButtonLabel": { "message": "Google翻訳が出ない場合はこちら" },
-  "options_captchaHelp": { "message": "Google翻訳から「ロボットではありません」認証を求められている可能性があります。ボタンを押すと確認用ページが新しいタブで開きます（DeepL・Gemini・ローカル翻訳のエラーには関係ありません）。" }
+  "options_captchaHelp": { "message": "Google翻訳から「ロボットではありません」認証を求められている可能性があります。ボタンを押すと確認用ページが新しいタブで開きます（DeepL・Gemini・ローカル翻訳のエラーには関係ありません）。" },
+
+  "options_plamoServerSts": { "message": "シンプル翻訳サーバー（おすすめ）" },
+  "options_plamoApiKeyLabel": { "message": "合言葉（シンプル翻訳サーバーのAPIキー）" },
+  "options_plamoTestOkSts": { "message": "接続OK：「$NAME$」として登録済み", "placeholders": { "name": { "content": "$1" } } },
+  "options_plamoPausedNote": { "message": "（ただし、いまは一時停止中です）" },
+  "options_plamoErrNoKey": { "message": "シンプル翻訳サーバーの「接続アプリ」タブで発行した合言葉を入力してください。" },
+  "options_plamoErrBadKey": { "message": "合言葉が違うか、取り消されています。シンプル翻訳サーバーで確認してください。" },
+  "popup_localPaused": { "message": "一時停止中" },
+  "popup_localBadKey": { "message": "合言葉が違います" },
+  "content_refusedSecret": { "message": "🔒 パスワード等らしき文字列を含むため、翻訳しませんでした（外部にも送っていません）" }
 }

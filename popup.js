@@ -53,6 +53,8 @@ const LOCAL_STATES = {
   checking: { dot: "#888", color: "#555", text: "popup_localChecking", help: "popup_localAutoHelp" },
   ok: { dot: "#28a745", color: "#28a745", text: "popup_localOk", help: "popup_localAutoHelp" },
   stopped: { dot: "#dc2626", color: "#dc2626", text: "popup_localStopped", help: "popup_localFallbackHelp" },
+  paused: { dot: "#888", color: "#555", text: "popup_localPaused", help: "popup_localFallbackHelp" },
+  badKey: { dot: "#dc2626", color: "#dc2626", text: "popup_localBadKey", help: "popup_localFallbackHelp" },
   noModel: { dot: "#dc2626", color: "#dc2626", text: "popup_localNoModel", help: "popup_localFallbackHelp" },
   error: { dot: "#dc2626", color: "#dc2626", text: "popup_localError", help: "popup_localFallbackHelp" },
 };
@@ -95,7 +97,9 @@ function checkLocalServer() {
           localCheckButton.disabled = false;
           const error = response && response.error;
           if (response && response.success) {
-            showLocalState("ok");
+            showLocalState(response.paused ? "paused" : "ok");
+          } else if (error === "PLAMO_BAD_KEY" || error === "PLAMO_NO_KEY") {
+            showLocalState("badKey");
           } else if (error === "PLAMO_UNREACHABLE" || error === "PLAMO_TIMEOUT") {
             showLocalState("stopped");
           } else if (error === "PLAMO_MODEL_NOT_FOUND") {

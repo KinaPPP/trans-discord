@@ -1,12 +1,11 @@
 {
   "manifest_version": 3,
   "name": "__MSG_extName__",
-  "version": "1.15.1",
+  "version": "1.16.1",
   "description": "__MSG_extDescription__",
   "default_locale": "ja",
   "permissions": ["storage"],
   "host_permissions": [
-    "https://discord.com/*",
     "https://translate.googleapis.com/*",
     "https://api-free.deepl.com/*",
     "https://api.deepl.com/*",

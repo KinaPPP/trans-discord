@@ -13,6 +13,7 @@ const DEFAULT_SETTINGS = {
   geminiCustomPrompt: "",
   plamoServerType: "lmstudio",
   plamoServerUrl: "http://localhost:1234",
+  plamoApiKey: "",
   plamoForm: "auto",
   sourceLang: "auto",
   targetLang: "browser",
@@ -158,6 +159,7 @@ chrome.storage.local.get(DEFAULT_SETTINGS, (result) => {
 
 // --- ローカル翻訳（PLaMo） ---
 const PLAMO_DEFAULT_URLS = {
+  sts: "http://localhost:5055",
   lmstudio: "http://localhost:1234",
   llamacpp: "http://localhost:8000",
   ollama: "http://localhost:11434",
@@ -165,6 +167,12 @@ const PLAMO_DEFAULT_URLS = {
 const plamoServerTypeSelect = document.getElementById("plamoServerTypeSelect");
 const plamoServerUrlInput = document.getElementById("plamoServerUrlInput");
 const plamoFormSelect = document.getElementById("plamoFormSelect");
+const plamoApiKeyInput = document.getElementById("plamoApiKeyInput");
+
+// 合言葉の欄は常に表示し、シンプル翻訳サーバー以外では入力できないようにする（画面の並びを変えないため）
+function updateApiKeyState() {
+  plamoApiKeyInput.disabled = plamoServerTypeSelect.value !== "sts";
+}
 const plamoTestButton = document.getElementById("plamoTestButton");
 const plamoTestResult = document.getElementById("plamoTestResult");
 
@@ -177,6 +185,15 @@ chrome.storage.local.get(DEFAULT_SETTINGS, (result) => {
   plamoServerTypeSelect.value = result.plamoServerType;
   plamoServerUrlInput.value = result.plamoServerUrl;
   plamoFormSelect.value = result.plamoForm;
+  plamoApiKeyInput.value = result.plamoApiKey;
+  updateApiKeyState();
+});
+
+plamoApiKeyInput.addEventListener("change", () => {
+  const key = plamoApiKeyInput.value.trim();
+  plamoApiKeyInput.value = key;
+  chrome.storage.local.set({ plamoApiKey: key });
+  showPlamoResult("", null);
 });
 
 plamoServerTypeSelect.addEventListener("change", () => {
@@ -188,6 +205,7 @@ plamoServerTypeSelect.addEventListener("change", () => {
     plamoServerUrl: PLAMO_DEFAULT_URLS[type],
     plamoModel: "",
   });
+  updateApiKeyState();
   showPlamoResult("", null);
 });
 
@@ -208,6 +226,8 @@ function plamoErrorMessage(code) {
     PLAMO_UNREACHABLE: "options_plamoErrUnreachable",
     PLAMO_TIMEOUT: "options_plamoErrUnreachable",
     PLAMO_MODEL_NOT_FOUND: "options_plamoErrNoModel",
+    PLAMO_NO_KEY: "options_plamoErrNoKey",
+    PLAMO_BAD_KEY: "options_plamoErrBadKey",
     PLAMO_FORBIDDEN:
       plamoServerTypeSelect.value === "ollama"
         ? "options_plamoErrOllamaOrigin"
@@ -224,11 +244,14 @@ plamoTestButton.addEventListener("click", () => {
       action: "plamoTest",
       serverType: plamoServerTypeSelect.value,
       serverUrl: plamoServerUrlInput.value.trim(),
+      apiKey: plamoApiKeyInput.value.trim(),
     },
     (response) => {
       plamoTestButton.disabled = false;
       if (response && response.success) {
-        showPlamoResult(chrome.i18n.getMessage("options_plamoTestOk", [response.model]), true);
+        const okKey = plamoServerTypeSelect.value === "sts" ? "options_plamoTestOkSts" : "options_plamoTestOk";
+        const pausedNote = response.paused ? chrome.i18n.getMessage("options_plamoPausedNote") : "";
+        showPlamoResult(chrome.i18n.getMessage(okKey, [response.model]) + pausedNote, true);
       } else {
         showPlamoResult(plamoErrorMessage(response && response.error), false);
       }

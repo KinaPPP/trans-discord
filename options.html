@@ -98,6 +98,9 @@
     font-size: 16px;
     color: #888;
   }
+  .maskedInput {
+    -webkit-text-security: disc;
+  }
 </style>
 </head>
 <body>
@@ -160,6 +163,7 @@
 
     <span class="fieldLabel" data-i18n="options_plamoServerTypeLabel">サーバーの種類</span>
     <select id="plamoServerTypeSelect">
+      <option value="sts" data-i18n="options_plamoServerSts">シンプル翻訳サーバー（おすすめ）</option>
       <option value="lmstudio">LM Studio</option>
       <option value="llamacpp">llama.cpp（llama-server）</option>
       <option value="ollama">Ollama</option>
@@ -170,6 +174,9 @@
       <input type="text" id="plamoServerUrlInput" placeholder="http://localhost:1234" spellcheck="false" />
       <button id="plamoTestButton" type="button" style="white-space:nowrap; width:auto;" data-i18n="options_plamoTestButton">接続テスト</button>
     </div>
+    <span class="fieldLabel" data-i18n="options_plamoApiKeyLabel">合言葉（シンプル翻訳サーバーのAPIキー）</span>
+    <!-- 右クリックやコピー・貼り付けを普通に使えるよう、文字の欄にして見た目だけ伏せ字にする -->
+    <input type="text" id="plamoApiKeyInput" class="maskedInput" placeholder="sts_..." spellcheck="false" autocomplete="off" />
     <div id="plamoTestResult" style="margin-top:6px; font-size:12px; min-height:16px;"></div>
 
     <span class="fieldLabel" data-i18n="options_plamoFormLabel">日本語訳の文体</span>
@@ -180,7 +187,7 @@
     </select>
 
     <p class="help">
-      <span data-i18n="options_plamoHelp">PLaMo 3 Translate を自分のPCで起動しておく必要があります（2BのQ4_K_M版がおすすめ）。翻訳はPC内で完結し、外部には送信されません。接続先は自分のPC（localhost）に限ります。翻訳できなかったときは、APIキーのあるDeepL・Gemini、最後にGoogle翻訳へ自動的に切り替わります。ポルトガル語は非対応のため、他のエンジンで翻訳されます。</span>
+      <span data-i18n="options_plamoHelp">シンプル翻訳サーバー、またはLM Studio等で PLaMo 3 Translate を自分のPCで起動しておく必要があります（モデルは2BのQ4_K_M版がおすすめ）。ローカル翻訳で訳せた発言は、自分のPCの外には送られません。ただし、サーバーが止まっている・一時停止中・合言葉が違うなどで訳せなかったときは、APIキーのあるDeepL・Gemini、最後にGoogle翻訳へ自動的に切り替わり、その発言は外部に送られます。パスワードやトークンらしき文字列を含む発言は、どの場合も外部のサービスには送りません（代表的な形だけを見分ける補助的な守りです）。接続先は自分のPC（localhost）に限ります。ポルトガル語は非対応のため、他のエンジンで翻訳されます。</span>
       <br />
       <a href="https://huggingface.co/pfnet/plamo-3-translate-2b-GGUF" target="_blank" rel="noopener" data-i18n="options_plamoModelLink">モデルの入手（Hugging Face）</a>
       ／ Built with PLaMo（<a href="https://plamo.preferredai.jp/info/plamo-community-license-ja" target="_blank" rel="noopener" data-i18n="options_plamoLicenseLink">PLaMoコミュニティライセンス</a>）
