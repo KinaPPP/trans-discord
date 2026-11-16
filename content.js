@@ -101,7 +101,11 @@ function isSecretChannel() {
   // 2. チャンネル一覧の、いま開いているチャンネルの項目。
   //    Discordは項目の読み上げ用の名前に「〇〇(テキストチャンネル), プライベートチャンネル（ロック中）」のように
   //    書き、アイコンには「テキスト(限定) icon」のような名前を付けている
-  const currentLink = document.querySelector(`a[href="${location.pathname}"]`);
+  // サーバーのアイコンから入ったときはURLにチャンネルのIDが付かないので、
+  // 一覧で「いま開いている」印（aria-current="page"）が付いた項目も使う
+  const currentLink =
+    document.querySelector(`a[href="${location.pathname}"]`) ||
+    document.querySelector('a[data-list-item-id^="channels___"][aria-current="page"]');
   const items = [
     currentLink,
     document.querySelector('[data-list-item-id^="channels___"][aria-selected="true"]'),
@@ -115,10 +119,10 @@ function isSecretChannel() {
 
   // 3. スレッド（フォーラムの投稿を含む）を開いているとき。
   //    スレッドはチャンネル一覧に普通のリンクとして載らないので、親のチャンネルを調べる
-  if (!currentLink) {
+  if (!currentLink || location.pathname.includes("/threads/")) {
     const parents = findThreadParents();
     // 親が分からないスレッドは、鍵付きの中のものかもしれないので、念のため翻訳しない
-    if (parents.length === 0) return true;
+    if (!currentLink && parents.length === 0) return true;
     if (parents.some(isLockedItem)) return true;
   }
 
@@ -176,21 +180,21 @@ const LOCK_LABEL_PATTERN = new RegExp(
 );
 
 // チャンネル一覧の項目が鍵付きかどうか。
-// 項目自身の名前は先頭にチャンネル名が入るので、チャンネル名の部分（最初の区切りまで）は除いて調べる
+// 項目自身の名前は「件の未読、general(テキストチャンネル), プライベートチャンネル（ロック中）」のように
+// チャンネル名と種類のかっこ書きが先に来るので、最初の閉じかっこより後ろだけを調べる
 // （「lockdown-攻略」のような公開チャンネル名で誤判定しないように）。
-// 中のアイコンの名前（「テキスト(限定) icon」など）はチャンネル名を含まないので、そのまま調べる
+// 中のアイコンの名前（「テキスト(限定) icon」など）はチャンネル名を含まないので、そのまま調べる。
+// ※ 公開チャンネルでも「テキスト(アクティブなスレッド) icon」のようにかっこ書きが付くことがあるため、
+//   かっこ書きの有無ではなく、鍵付き・限定を表す語で判定する
 function isLockedItem(el) {
   const own = el.getAttribute("aria-label") || "";
-  const afterName = own.split(/[,，、]/).slice(1).join(",");
+  const close = own.search(/[)）]/);
+  const afterName = close >= 0 ? own.slice(close + 1) : own.split(/[,，、]/).slice(1).join(",");
   if (LOCK_LABEL_PATTERN.test(afterName)) return true;
   return [...el.querySelectorAll("[aria-label]")].some((child) => {
     const label = child.getAttribute("aria-label") || "";
     // アイコン以外のボタン（「チャンネルに招待」など）は対象外
-    if (!/icon|アイコン/i.test(label)) return false;
-    // 普通のチャンネルは「テキスト icon」「Text icon」、鍵付きは「テキスト(限定) icon」「Text (Limited) icon」のように、
-    // どの言語でも「かっこ書き」が足される。言葉が分からない言語でも見分けられるよう、かっこ書きの有無で判定する
-    // （年齢制限など別の理由のかっこ書きでも、翻訳しない側に倒れるので安全）
-    return /[(（].+[)）]/.test(label) || LOCK_LABEL_PATTERN.test(label);
+    return /icon|アイコン/i.test(label) && LOCK_LABEL_PATTERN.test(label);
   });
 }
 
@@ -199,6 +203,8 @@ function isLockedItem(el) {
 // ものかもしれないので、読み取らない
 function isInChatList(el) {
   if (!el.closest('[data-list-id^="chat-messages"]')) return false;
+  // 返信の上に出る引用（元の発言の抜粋）にも同じ message-content-数字 のIDが付くので除外する
+  if (el.closest('[id^="message-reply-context-"], [class*="repliedText"]')) return false;
   if (el.closest('[role="dialog"], [class*="searchResult"], [class*="recentMentions"], [class*="popout"], [class*="inbox"]')) {
     return false;
   }
@@ -399,9 +405,18 @@ function extractText(element) {
       //   innerTextの「見た目上隠れているかどうか」の判定が効かない。
       //   そのためDiscordのスクリーンリーダー専用テキスト（hiddenVisually）は
       //   ここで明示的に取り除く。
-      "code, pre, .discord-translated-message, .discord-translated-title, [class*='hiddenVisually'], [class*='spoilerContent'], [class*='spoilerMarkdownContent'], [class*='spoilerText']"
+      "code, pre, .discord-translated-message, .discord-translated-title, [class*='hiddenVisually']"
     )
     .forEach((n) => n.remove());
+  // ネタバレ（スポイラー）は中身を送らず「…」に置き換える。
+  // 単に消すと「The patch notes say , マジで？」のように文が崩れて誤訳を招くため、
+  // 伏せた部分があることだけを翻訳エンジンに伝える（開いた後も目印は残るので同じ扱い）
+  clone
+    .querySelectorAll("[class*='spoilerContent'], [class*='spoilerMarkdownContent'], [class*='spoilerText']")
+    .forEach((n) => {
+      if (!clone.contains(n)) return; // 外側のネタバレと一緒に置き換え済み
+      n.replaceWith(document.createTextNode("…"));
+    });
 
   const text = walkTextWithBreaks(clone);
   // 連続する空行は2つ（段落の区切り分）までに詰める
@@ -671,7 +686,7 @@ function scanTargets() {
   // 1. チャット本文・メッセージ
   document
     .querySelectorAll(
-      'div[id^="message-content-"], [class*="messageContent-"]'
+      'div[id^="message-content-"]'
     )
     .forEach((el) => {
       if (isInChatList(el)) registerElement(el, "message");
