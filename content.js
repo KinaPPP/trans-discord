@@ -73,89 +73,181 @@ chrome.storage.onChanged.addListener((changes, area) => {
 });
 
 // チャンネル/スレッド移動（DiscordはSPAなのでページ遷移が起きない）を検知して
-// 発動フラグと未翻訳リストをリセットする
+// 発動フラグと未翻訳リストをリセットする。
+// 定期チェックに加え、スキャンや送信の直前にも呼んで、移動直後の取り違えを防ぐ
 let lastUrl = location.href;
-setInterval(() => {
-  if (location.href !== lastUrl) {
-    lastUrl = location.href;
-    autoArmed = false;
-    pendingContainers.clear();
-    seenTitleTexts.clear();
+function checkUrlChange() {
+  if (location.href === lastUrl) return;
+  lastUrl = location.href;
+  autoArmed = false;
+  pendingContainers.clear();
+  seenTitleTexts.clear();
 
-    // DM・鍵付きチャンネルに移動した場合は、念のため既存の翻訳ボックスも消す
-    if (isSecretChannel()) {
-      document
-        .querySelectorAll(".discord-translated-message, .discord-translated-title")
-        .forEach((el) => el.remove());
-      processedElements = new WeakSet();
-    }
+  // DM・鍵付きチャンネルに移動した場合は、念のため既存の翻訳ボックスも消す
+  if (isSecretChannel()) {
+    document
+      .querySelectorAll(".discord-translated-message, .discord-translated-title")
+      .forEach((el) => el.remove());
+    processedElements = new WeakSet();
   }
-}, 500);
+}
+setInterval(checkUrlChange, 500);
 
-// 現在開いているチャンネルがプライベート（DM・鍵付き等）かどうかを判定する。
-// 該当する場合はテキストの抽出・翻訳リクエストの発行を一切行わない。
-function isSecretChannel() {
-  // 1. DM・グループDM（URLが /channels/@me で始まる）
-  if (location.pathname.startsWith("/channels/@me")) return true;
+// URLから、いま開いているサーバー・チャンネル・スレッドのIDを取り出す。
+// /channels/サーバー[/チャンネル[/メッセージ]] または /channels/サーバー/親チャンネル/threads/スレッド
+function parseChannelPath() {
+  const segs = location.pathname.split("/").filter(Boolean);
+  if (segs[0] !== "channels") return null;
+  const isId = (v) => /^\d+$/.test(v || "");
+  const thread = segs[3] === "threads" && isId(segs[4]) ? segs[4] : null;
+  return {
+    guild: segs[1] || "",
+    channel: isId(segs[2]) ? segs[2] : null,
+    thread,
+  };
+}
 
-  // 2. チャンネル一覧の、いま開いているチャンネルの項目。
-  //    Discordは項目の読み上げ用の名前に「〇〇(テキストチャンネル), プライベートチャンネル（ロック中）」のように
-  //    書き、アイコンには「テキスト(限定) icon」のような名前を付けている
-  // サーバーのアイコンから入ったときはURLにチャンネルのIDが付かないので、
-  // 一覧で「いま開いている」印（aria-current="page"）が付いた項目も使う
-  const currentLink =
-    document.querySelector(`a[href="${location.pathname}"]`) ||
-    document.querySelector('a[data-list-item-id^="channels___"][aria-current="page"]');
-  const items = [
-    currentLink,
-    document.querySelector('[data-list-item-id^="channels___"][aria-selected="true"]'),
-    document.querySelector('[data-list-item-id^="channels___"][class*="selected"]'),
-  ].filter(Boolean);
-  for (const item of items) {
-    if (isLockedItem(item)) return true;
-    const row = item.closest("[data-list-item-id]");
-    if (row && row !== item && isLockedItem(row)) return true;
+// 翻訳ボックスが「どのチャンネルで作られたか」の目印（送信直前の照合に使う）。
+// フォーラムの投稿を開くと一覧と投稿が並んで表示されるので、/threads/ の形では親チャンネルを目印にする
+// （投稿自体が鍵付きかどうかは、送信直前の isSecretChannel() で別途確かめる）
+function currentChannelKey() {
+  const p = parseChannelPath();
+  if (!p) return "";
+  return `${p.guild}/${p.channel || ""}`;
+}
+
+// 左のチャンネル一覧の項目をIDで探す（本文中のリンク等は対象にしない）
+function sidebarItem(id) {
+  if (!/^\d+$/.test(id || "")) return null;
+  return document.querySelector(`[data-list-item-id="channels___${id}"]`);
+}
+
+// スレッドの行の親チャンネル。一覧ではスレッドの行は親チャンネルのすぐ後ろに並ぶので、前にたどって最初のリンクが親
+function precedingChannelLink(row) {
+  const rows = [...document.querySelectorAll('[data-list-item-id^="channels___"]')];
+  for (let i = rows.indexOf(row) - 1; i >= 0; i--) {
+    if (rows[i].tagName === "A") return rows[i];
   }
+  return null;
+}
 
-  // 3. スレッド（フォーラムの投稿を含む）を開いているとき。
-  //    スレッドはチャンネル一覧に普通のリンクとして載らないので、親のチャンネルを調べる
-  if (!currentLink || location.pathname.includes("/threads/")) {
-    const parents = findThreadParents();
-    // 親が分からないスレッドは、鍵付きの中のものかもしれないので、念のため翻訳しない
-    if (!currentLink && parents.length === 0) return true;
-    if (parents.some(isLockedItem)) return true;
+// svgの中身（path等の形）を比べるための文字列。色やサイズの違いは無視する
+function iconShape(svg) {
+  return [...svg.querySelectorAll("*")]
+    .map((n) =>
+      n.tagName + ":" +
+      ["d", "x", "y", "width", "height", "href", "mask", "clip-path", "transform", "fill-rule"]
+        .map((a) => n.getAttribute(a) || "")
+        .join(",")
+    )
+    .join("|");
+}
+
+// 全画面で開いたスレッドが「普通の（公開の）スレッド」だと確かめられるか。
+// 公開チャンネルの中のプライベートスレッドは、一覧の行にも読み上げ用の名前にも目印がなく、
+// 見出しの「親 > スレッド名」のスレッド名の前のアイコンだけが、鍵付きの形に変わる。
+// そこで次がすべてそろったときだけ公開とみなし、どれか欠ければ翻訳しない側に倒す：
+//  - 見出しに「親 > スレッド」の形（caret）があり、その後にアイコンとスレッド名がある
+//  - そのスレッド名が、一覧のスレッドの行の名前に含まれる（別のスレッドの見出しを見ていない）
+//  - アイコンの形が、同じ見出しの右上にある「スレッド」ボタン等のアイコンと同じ（普通のスレッドの形）
+function isConfirmedPublicThreadHeader(threadId) {
+  const row = sidebarItem(threadId);
+  if (!row) return false;
+  const rowName = row.getAttribute("aria-label") || "";
+  for (const upper of document.querySelectorAll('[class*="upperContainer"]')) {
+    const caret = upper.querySelector('[class*="caret"]');
+    if (!caret) continue;
+    const after = [...upper.querySelectorAll('[class*="channelIcon"], h1, h2, h3')].filter(
+      (el) => caret.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING
+    );
+    const iconWrap = after.find((el) => el.matches('[class*="channelIcon"]'));
+    const title = after.find((el) => /^H[1-3]$/.test(el.tagName));
+    if (!iconWrap || !title) continue;
+    // 見出しには読み上げ専用の「スレッド: 」等が隠れて付いているので、見えている文字だけで比べる
+    const visible = title.cloneNode(true);
+    visible.querySelectorAll('[class*="hiddenVisually"]').forEach((n) => n.remove());
+    const name = visible.textContent.trim();
+    if (!name || !isSameThreadName(rowName, name)) continue;
+    const icon = iconWrap.querySelector("svg");
+    const shape = icon && iconShape(icon);
+    if (!shape) continue;
+    const section = upper.closest("section") || upper;
+    const same = [...section.querySelectorAll("svg")].some(
+      (svg) => !svg.closest('[class*="channelIcon"]') && iconShape(svg) === shape
+    );
+    if (same) return true;
   }
-
   return false;
 }
 
-// 開いているスレッドの親チャンネル（一覧のリンク）を探す
-function findThreadParents() {
-  const segs = location.pathname.split("/").filter(Boolean); // ["channels", サーバー, ID, ("threads", スレッドID)]
-  const parents = [];
-  const linkFor = (id) => id && /^\d+$/.test(id) && document.querySelector(`a[href$="/${id}"][data-list-item-id^="channels___"], a[href$="/${id}"]`);
+// 一覧のスレッドの行の名前（「件の未読、名前（スレッド）」「名前 (thread)」など）が、指定した名前そのものか。
+// 部分一致だと「スレッド」のような短い名前がどの行にも当たるので、前後の決まった部分を外して完全一致で比べる
+function isSameThreadName(rowLabel, name) {
+  const title = rowLabel.replace(/\s*[(（][^()（）]*[)）]\s*$/, "").trim();
+  return title === name || title.endsWith(`、${name}`) || title.endsWith(`, ${name}`);
+}
 
-  // a. URLが /channels/サーバー/親/threads/スレッド の形なら、親のIDが入っている
-  const ti = segs.indexOf("threads");
-  if (ti > 0) parents.push(linkFor(segs[ti - 1]));
+// 指定したフォーラムの投稿一覧に、指定した投稿のカードが表示されているか。
+// リスト表示ではカードに forum-channel-list-<フォーラムID>___<投稿ID>、
+// ギャラリー表示ではカードに forum-grid-view___card-…-<投稿ID> の目印が付く。
+// ギャラリーにはURLのフォーラム（一覧として開いているフォーラム）の投稿しか並ばないので、
+// そのフォーラムの一覧が出ていて、その中に投稿のカードがあれば、そのフォーラムの投稿だと言える
+function isForumPostCardShown(guild, forumId, postId) {
+  const isId = (v) => /^\d+$/.test(v || "");
+  if (!isId(guild) || !isId(forumId) || !isId(postId)) return false;
+  if (document.querySelector(`[data-list-item-id="forum-channel-list-${forumId}___${postId}"]`)) return true;
+  return [...document.querySelectorAll('[data-grid-item-id^="forum-grid-view___"]')].some((el) =>
+    el.getAttribute("data-grid-item-id").endsWith(`-${postId}`)
+  );
+}
 
-  // b. チャンネル一覧では、スレッドの行は親チャンネルのすぐ後ろに並ぶ。前にたどって最初のリンクが親
-  const threadId = segs[segs.length - 1];
-  const rows = [...document.querySelectorAll('[data-list-item-id^="channels___"]')];
-  const idx = rows.findIndex((r) => r.getAttribute("data-list-item-id") === `channels___${threadId}`);
-  for (let i = idx - 1; idx > 0 && i >= 0; i--) {
-    if (rows[i].tagName === "A") {
-      parents.push(rows[i]);
-      break;
-    }
+// URLにチャンネルIDが無いとき（サーバーのアイコンから入ったとき）に、一覧で「いま開いている」項目
+function currentLinkForGuild(guild) {
+  const current = [
+    ...document.querySelectorAll('a[data-list-item-id^="channels___"][aria-current="page"]'),
+  ].filter((a) => (a.getAttribute("href") || "").startsWith(`/channels/${guild}/`));
+  return current.length === 1 ? current[0] : null;
+}
+
+// 現在開いているチャンネルがプライベート（DM・鍵付き等）かどうかを判定する。
+// 該当する場合はテキストの抽出・翻訳リクエストの発行を一切行わない。
+// 判定に使う項目は「URLのIDと一致する一覧の項目」だけにし、見つからなければ翻訳しない側に倒す
+// （移動の途中で前のチャンネルの項目が残っていても、取り違えないように）
+function isSecretChannel() {
+  // 1. DM・グループDM（URLが /channels/@me で始まる）
+  if (location.pathname.startsWith("/channels/@me")) return true;
+  const p = parseChannelPath();
+  if (!p || !/^\d+$/.test(p.guild)) return true;
+
+  // 2. サーバーのアイコンから入ったとき（URLにチャンネルのIDが付かない）は、
+  //    一覧で「いま開いている」印（aria-current="page"）が付いた、このサーバーの項目を使う
+  if (!p.channel) {
+    const current = currentLinkForGuild(p.guild);
+    return !current || isLockedItem(current);
   }
 
-  // c. フォーラムの投稿一覧（data-list-id="forum-channel-list-<フォーラムのID>"）が表示されていれば、そのフォーラム
-  document.querySelectorAll('[data-list-id^="forum-channel-list-"]').forEach((list) => {
-    parents.push(linkFor(list.getAttribute("data-list-id").slice("forum-channel-list-".length)));
-  });
+  // 3. /親チャンネル/threads/スレッド の形（フォーラムの投稿や、サイドパネルで開いたスレッド）。
+  //    ここでは親チャンネルを判定する。スレッドの中身（サイドパネル）は欄ごとの判定（isAllowedPane）で決める
+  if (p.thread) {
+    const parent = sidebarItem(p.channel);
+    if (!parent || parent.tagName !== "A") return true;
+    if (isLockedItem(parent)) return true;
+    const row = sidebarItem(p.thread);
+    if (row && isLockedItem(row)) return true;
+    return false;
+  }
 
-  return parents.filter(Boolean);
+  // 4. 普通のチャンネル、または一覧のスレッドの行から開いたスレッド（全画面）
+  const item = sidebarItem(p.channel);
+  if (!item) return true; // 一覧に見当たらないものは、念のため翻訳しない
+  if (isLockedItem(item)) return true;
+  if (item.tagName !== "A") {
+    // スレッドの行：親チャンネルが鍵なしで、見出しから公開のスレッドだと確かめられたときだけ
+    const parent = precedingChannelLink(item);
+    if (!parent || isLockedItem(parent)) return true;
+    if (!isConfirmedPublicThreadHeader(p.channel)) return true;
+  }
+  return false;
 }
 
 // 鍵付き・限定公開を表す語（Discordの表示言語で変わるため、主な言語ぶん用意する）
@@ -180,17 +272,18 @@ const LOCK_LABEL_PATTERN = new RegExp(
 );
 
 // チャンネル一覧の項目が鍵付きかどうか。
-// 項目自身の名前は「件の未読、general(テキストチャンネル), プライベートチャンネル（ロック中）」のように
-// チャンネル名と種類のかっこ書きが先に来るので、最初の閉じかっこより後ろだけを調べる
-// （「lockdown-攻略」のような公開チャンネル名で誤判定しないように）。
+// 項目自身の名前は「件の未読、general(テキストチャンネル), プライベートチャンネル（ロック中）」や
+// 「タイトル（プライベートスレッド）」のように、名前のあとに種類や状態がかっこ書き・区切りで続くので、
+// 最初の開きかっこから後ろを調べる（「lockdown-攻略」のような名前で誤判定しないように。
+// 名前の中にかっこがあって誤判定しても、翻訳しない側に倒れるだけなので安全）。
 // 中のアイコンの名前（「テキスト(限定) icon」など）はチャンネル名を含まないので、そのまま調べる。
 // ※ 公開チャンネルでも「テキスト(アクティブなスレッド) icon」のようにかっこ書きが付くことがあるため、
 //   かっこ書きの有無ではなく、鍵付き・限定を表す語で判定する
 function isLockedItem(el) {
   const own = el.getAttribute("aria-label") || "";
-  const close = own.search(/[)）]/);
-  const afterName = close >= 0 ? own.slice(close + 1) : own.split(/[,，、]/).slice(1).join(",");
-  if (LOCK_LABEL_PATTERN.test(afterName)) return true;
+  const open = own.search(/[(（]/);
+  const status = open >= 0 ? own.slice(open) : own.split(/[,，、]/).slice(1).join(",");
+  if (LOCK_LABEL_PATTERN.test(status)) return true;
   return [...el.querySelectorAll("[aria-label]")].some((child) => {
     const label = child.getAttribute("aria-label") || "";
     // アイコン以外のボタン（「チャンネルに招待」など）は対象外
@@ -208,7 +301,99 @@ function isInChatList(el) {
   if (el.closest('[role="dialog"], [class*="searchResult"], [class*="recentMentions"], [class*="popout"], [class*="inbox"]')) {
     return false;
   }
-  return true;
+  return isAllowedPane(el);
+}
+
+// 要素があるチャット欄が「どのチャンネル（スレッド）の欄か」。
+// 発言の行には id="chat-messages-<チャンネルID>-<発言ID>" が付いているので、欄の中の全部の行から読む。
+// 行によってIDが食い違うときは、どの欄か確かめられないので null
+function chatPaneChannelId(el) {
+  const list = el.closest('[data-list-id^="chat-messages"]');
+  if (!list) return null;
+  const ids = new Set();
+  list.querySelectorAll('li[id^="chat-messages-"]').forEach((row) => {
+    const m = row.id.match(/^chat-messages-(\d+)-/);
+    ids.add(m ? m[1] : "");
+  });
+  if (ids.size !== 1) return null;
+  const [id] = ids;
+  return id || null;
+}
+
+// 1回のスキャンの間だけ、欄ごとの判定結果を使い回す（発言ごとに一覧や見出しを調べ直さないように）
+let paneCache = null;
+
+// チャット欄ごとに、翻訳してよい欄かを判定する。
+// スレッドを右側のサイドパネルで開くと、URLはスレッドに、上の見出しは親チャンネルのままになり、
+// ページ全体の判定だけでは「どちらの欄がどのチャンネルか」を取り違える。そこで欄ごとに、
+// 欄の発言に付いたチャンネルIDから判定する。どの条件も「公開だと確かめられたときだけ許可」にする
+function isAllowedPane(el) {
+  const list = el.closest('[data-list-id^="chat-messages"]');
+  if (!list) return false;
+  if (paneCache && paneCache.has(list)) return paneCache.get(list);
+  const result = judgePane(list);
+  if (paneCache) paneCache.set(list, result);
+  return result;
+}
+
+function judgePane(list) {
+  const paneId = chatPaneChannelId(list);
+  const p = parseChannelPath();
+  if (!paneId || !p) return false;
+
+  // a. メインの欄（<main> の中）。左のチャンネル一覧の項目で判定する
+  if (list.closest("main")) {
+    const item = sidebarItem(paneId);
+    if (!item || isLockedItem(item)) return false;
+    if (item.tagName === "A") {
+      // チャンネル。URLのチャンネル（URLにIDが無ければ「いま開いている」項目）と一致すること
+      let pageChannel = p.channel;
+      if (!pageChannel) {
+        const current = currentLinkForGuild(p.guild);
+        pageChannel = current ? (current.getAttribute("href") || "").split("/").pop() : null;
+      }
+      return !!pageChannel && paneId === pageChannel;
+    }
+    // スレッドを全画面で開いているとき：URLがそのスレッドで、親が鍵なしで、
+    // 見出しから公開のスレッドだと確かめられること
+    if (p.thread || p.channel !== paneId) return false;
+    const parent = precedingChannelLink(item);
+    return !!parent && !isLockedItem(parent) && isConfirmedPublicThreadHeader(paneId);
+  }
+
+  // b. サイドパネル。フォーラムの投稿だけを翻訳する。
+  //    URLが /親/threads/投稿 で、欄がその投稿のもので、その親フォーラムの投稿一覧に
+  //    その投稿のカードが表示されていること（テキストチャンネルのスレッドをサイドパネルで開いたときは、メインが普通の
+  //    チャット欄になる。パネルでは公開かプライベートか見分けられないので翻訳しない）
+  if (!p.thread || paneId !== p.thread) return false;
+  if (document.querySelector('main [data-list-id^="chat-messages"]')) return false;
+  // パネルの投稿が、本当にURLのフォーラムの投稿か（一覧にその投稿のカードがあるか）を確かめる。
+  // チャット内のリンク等で「フォーラム/threads/別チャンネルのスレッド」の形に移ると、
+  // Discordはフォーラムの一覧の横に別チャンネルのスレッドを表示してしまうため
+  if (!isForumPostCardShown(p.guild, p.channel, p.thread)) return false;
+  const parent = sidebarItem(p.channel);
+  return !!parent && parent.tagName === "A" && !isLockedItem(parent);
+}
+
+// 見出し（フォーラムのタイトル、スレッド名など）を翻訳してよい場所か。
+// チャット欄の中なら欄ごとの判定に従う。チャット欄の外は、フォーラムの投稿一覧のカードだけ
+// （スレッド一覧のポップアウト、検索結果、一覧の行、見出しのバーなどは読まない）
+function isAllowedTitleLocation(el) {
+  if (el.closest('[role="dialog"], [class*="searchResult"], [class*="recentMentions"], [class*="popout"], [class*="inbox"]')) {
+    return false;
+  }
+  if (el.closest('[data-list-id^="chat-messages"]')) return isAllowedPane(el);
+  const p = parseChannelPath();
+  if (!p || p.channel === null) return false;
+  const card = el.closest('li[class*="card"]');
+  if (!card) return false;
+  if (el.closest('[role="complementary"], nav, aside, [class*="upperContainer"]')) return false;
+  // そのカードが、フォーラムの投稿一覧（URLのフォーラムのリスト表示、またはギャラリー表示）のものであること
+  return !!(
+    card.querySelector(`[data-list-item-id^="forum-channel-list-${p.channel}___"]`) ||
+    card.closest(`[data-list-id="forum-channel-list-${p.channel}"]`) ||
+    card.querySelector('[data-grid-item-id^="forum-grid-view___"]')
+  );
 }
 
 // 極端に短い発言に翻訳ボタンを出さないためのしきい値
@@ -440,21 +625,39 @@ const visibilityObserver = new IntersectionObserver(
 function prepareTranslation(element) {
   const rawText = extractText(element);
   if (!rawText || !isTranslationCandidate(rawText)) return;
+  // 画面に入った時点の「どのチャンネル・どの欄か」を覚えておき、後の照合に使う
+  const origin = {
+    channelKey: currentChannelKey(),
+    paneId: element.closest('[data-list-id^="chat-messages"]') ? chatPaneChannelId(element) || "?" : "",
+  };
 
   // 翻訳元が「自動検出」で、翻訳先と同じ言語の発言には青バーを出さない設定のとき
   if (sourceLang === "auto" && skipNativeLanguage) {
     isInTargetLanguage(rawText, (sameLanguage) => {
-      if (!sameLanguage) addTranslationBox(element, rawText);
+      if (!sameLanguage) addTranslationBox(element, rawText, origin);
     });
     return;
   }
-  addTranslationBox(element, rawText);
+  addTranslationBox(element, rawText, origin);
 }
 
-function addTranslationBox(element, rawText) {
+// 要素が「いまも」翻訳してよい場所にあるか（登録時と同じチャンネル・同じ欄で、判定も変わっていない）
+function isStillAllowed(element, origin) {
+  checkUrlChange();
+  if (!extensionEnabled || isSecretChannel()) return false;
+  if (origin.channelKey !== currentChannelKey()) return false;
   const isTitle = element.dataset.translateType === "title";
-  // 判定を待つ間に拡張機能がOFFにされたり、DM等に移動した場合は何もしない
-  if (!extensionEnabled || isSecretChannel()) return;
+  if (isTitle ? !isAllowedTitleLocation(element) : !isInChatList(element)) return false;
+  if (origin.paneId) {
+    if (origin.paneId === "?" || chatPaneChannelId(element) !== origin.paneId) return false;
+  }
+  return true;
+}
+
+function addTranslationBox(element, rawText, origin) {
+  const isTitle = element.dataset.translateType === "title";
+  // 判定を待つ間に拡張機能がOFFにされたり、別のチャンネルやDM等に移動した場合は何もしない
+  if (!isStillAllowed(element, origin)) return;
 
   // タイトルは、添付ファイル側などに複製された同一テキストを二重表示しないよう
   // 全ページ内で最初の1件だけを対象にする
@@ -471,6 +674,8 @@ function addTranslationBox(element, rawText) {
   container.textContent = ""; // 文言は出さず、青いエリアだけにする（title属性でヒントは残す）
   container.dataset.state = "pending";
   container.dataset.rawText = rawText;
+  container.dataset.channelKey = origin.channelKey;
+  container.dataset.paneId = origin.paneId;
   container.title = "クリックでこの発言だけ翻訳します";
   container.addEventListener("click", (event) => {
     event.stopPropagation();
@@ -597,6 +802,21 @@ function runTranslation(container) {
   const rawText = container.dataset.rawText;
   if (!rawText) return;
 
+  // 送る直前に、作ったときと同じチャンネル・同じ欄にいるか・鍵付きでないかを改めて確かめる
+  // （移動の途中や、判定が変わった後に、別のチャンネルの発言を送らないように）
+  const sourceElement = containerSourceElement.get(container);
+  if (
+    !sourceElement ||
+    !isStillAllowed(sourceElement, {
+      channelKey: container.dataset.channelKey || "",
+      paneId: container.dataset.paneId || "",
+    })
+  ) {
+    pendingContainers.delete(container);
+    container.remove();
+    return;
+  }
+
   console.log("[トランス☆ディスコ] 翻訳リクエスト送信（本文はログに出しません）");
 
   container.dataset.state = "loading";
@@ -641,6 +861,8 @@ function runTranslation(container) {
 
 function registerElement(element, type = "message") {
   if (!element || processedElements.has(element)) return;
+  // 発言はチャット欄の、見出しは決まった場所のものだけ（編集後の再登録でも同じ判定を通す）
+  if (type === "title" ? !isAllowedTitleLocation(element) : !isInChatList(element)) return;
   if (isEffectivelyHidden(element)) return;
   if (type === "title" && isMessageHeaderElement(element)) return;
 
@@ -681,42 +903,28 @@ function isEffectivelyHidden(element) {
 
 function scanTargets() {
   if (!extensionEnabled) return;
+  checkUrlChange(); // 移動直後なら、先に発動フラグ等をリセットしてから判定する
   if (isSecretChannel()) return; // DM・鍵付きチャンネルではスキャンしない
 
-  // 1. チャット本文・メッセージ
-  document
-    .querySelectorAll(
-      'div[id^="message-content-"]'
-    )
-    .forEach((el) => {
+  paneCache = new Map();
+  try {
+    // 1. チャット本文・メッセージ
+    document.querySelectorAll('div[id^="message-content-"]').forEach((el) => {
       if (isInChatList(el)) registerElement(el, "message");
     });
 
-  // 2. フォーラム一覧のカードタイトル & スレッド見出し（既知パターン）
-  document
-    .querySelectorAll(
-      '[class*="postTitleText"], [class*="mainCard"] h3, [role="article"] h3, [class*="threadName"]'
-    )
-    .forEach((el) => {
-      registerElement(el, "title");
-    });
-
-  // 2b. スレッド詳細ヘッダー等の大見出し（data-text-variant属性は比較的安定）
-  document
-    .querySelectorAll('[data-text-variant^="heading-xxl"]')
-    .forEach((el) => {
-      registerElement(el, "title");
-    });
-
-  // 2c. 上記に該当しない見出し用の暫定フォールバック
-  // 左サイドバー等のUI文言を巻き込まないよう、本編領域（role="main"）内に限定する
-  document
-    .querySelectorAll(
-      '[role="main"] h1, [role="main"] h2, [role="main"] h3, [role="main"] [role="heading"]'
-    )
-    .forEach((el) => {
-      registerElement(el, "title");
-    });
+    // 2. フォーラムの投稿一覧のカードのタイトルと、チャット欄の中の大見出し（スレッド名など）。
+    //    場所の判定（isAllowedTitleLocation）を通ったものだけ
+    document
+      .querySelectorAll(
+        '[class*="postTitleText"], [class*="mainCard"] h3, [role="article"] h3, [data-text-variant^="heading-xxl"]'
+      )
+      .forEach((el) => {
+        registerElement(el, "title");
+      });
+  } finally {
+    paneCache = null;
+  }
 }
 
 // DOM変化のたびに即scanするのではなく、短い間隔でまとめて実行して負荷を抑える
